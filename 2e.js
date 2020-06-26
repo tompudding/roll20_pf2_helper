@@ -37,7 +37,6 @@ function get_attribute(id, attr_name) {
     objs = findObjs({type : 'attribute', characterid:id, name:attr_name})
     if( objs.length == 0 ) {
         log('no attribute darn');
-        log(findObjs)
         return undefined;
     }
     return objs[0].get('current');
@@ -195,7 +194,7 @@ function get_rolls(content, inlinerolls) {
         }
 
         var roll = inlinerolls[roll_index];
-        //log('name: ' + roll_name + ' roll: ' + roll + ' type: ' + roll_type + ' info: ' + roll_info);
+
         rolls[roll_type] = {name:roll_name, roll:roll, type:roll_type, info:roll_info};
     }
 
@@ -222,8 +221,6 @@ class AttackRoll extends Roll {
                 damage_type += ' & ' + rolls['damage_additional'].info;
             }
         }
-        log('monkey');
-        log(content);
 
         //It's possible to have traits on the attack roll...
         var match = RegExp(`{{roll01_info=[^}]*deadly.(\\d?d\\d+)`,"ig").exec(content);
@@ -292,7 +289,6 @@ class SpellRoll extends Roll {
             die_result = rolls['attack'].roll.results.rolls[0].results[0].v
         }
 
-        //log('to hit: ' + to_hit + ' result: ' + die_result + ' damage: ' + damage)
         self.attack = new Attack(to_hit, damage, damage_type, die_result, 0, false);
     }
 
@@ -302,7 +298,6 @@ class SpellRoll extends Roll {
         }
         var self = this;
         var description = `&{template:rolls} {{header=${this.name}: Spell}} ` + self.attack.format();
-        log('spell desc: ' + this.subheader)
         return description;
     }
 }
@@ -380,7 +375,6 @@ class GenericAttack extends Roll{
         if(array1 == null || array1.length < 3) {
             return;
         }
-        //log('blarray ' + array1)
         var index = get_index(array1[2]);
         if( null == index ) {
             log("No save index");
@@ -414,16 +408,14 @@ const getRepeatingSectionCounts = function (charid, prefix) {
 		_characterid: charid
 	}).forEach(o => {
 	    const attrName = o.get('name');
-            log("bobbins " + attrName);
-		var matches = regExp.exec(attrName);
-		if( null == matches ) {
-		    return;
-		}
-		if(!(matches[1] in ids)) {
-		    ids[matches[1]] = {};
-		    count += 1;
-		    log(matches);
-		}
+	    var matches = regExp.exec(attrName);
+	    if( null == matches ) {
+		return;
+	    }
+	    if(!(matches[1] in ids)) {
+		ids[matches[1]] = {};
+		count += 1;
+	    }
 		//ids[matches[1]][matches[2]] = o;
 	});
 	return count;//ids;
@@ -494,7 +486,8 @@ function roll_secret_skill(msg) {
         skill = skill.toUpperCase();
         let bonus = getAttrByName(id, skill);
         let who = msg.who;
-        while(bonus.startsWith('+')) {
+
+        while(bonus.startswith != undefined && bonus.startsWith('+')) {
             bonus = bonus.slice(1);
         }
         bonus = parseInt(bonus);
@@ -521,7 +514,6 @@ function roll_secret(msg) {
         return;
     }
     var who = msg.who;
-    //log('bonus = ' + bonus);
     sendChat('GM', `/w GM Secret roll for ${who} with bonus ${bonus_str} = [[1d20+${bonus}]]`);
 }
 
@@ -560,8 +552,9 @@ function parse_expressions(damage_string) {
                 }
                 //If only some part of it matched we're still done, but we need that part
                 expr.push(between_match[0]);
+                last += between_re.lastIndex;
                 if( between_re.lastIndex != between.length ) {
-                    last += between_re.lastIndex;
+
                     break;
                 }
                 if( match == null) {
@@ -594,13 +587,12 @@ function parse_expressions(damage_string) {
 
 function parse_damage(damage_string) {
     data = parse_expressions(damage_string);
-
     //Damage is easy, it's the first dice expression
     let damage = data.parts[data.dice[0]];
     let type = 'unknown';
     let rest_start = data.dice[0] + 1;
     //If there's a non dice expression between the first and second it's probably the type,
-    if( data.dice[1] != data.dice[0] + 1) {
+    if( data.dice[1] != data.dice[0] + 1 && data.parts.length > data.dice[0] + 1) {
         type = data.parts[data.dice[0] + 1];
         rest_start += 1;
     }
@@ -639,9 +631,49 @@ function parse_damage(damage_string) {
             additional : additional};
 }
 
-function parse_character(character, data) {
-    log('pc ' + character.id + ' : ' + data);
+function turn_off_marker_character(id, marker_name) {
+    var statuses = findObjs({represents:id});
+    for (var token of statuses) {
+        var status = token.get("statusmarkers");
+        if( status.indexOf(marker_name) == -1 ) {
+            continue;
+        }
+        var on = status.split(',');
+        var new_on = []
+        for(var item of on) {
+            if( item.indexOf(marker_name) == -1 ) {
+                new_on.push(item);
+            }
+        }
+        on = new_on.join(',');
+        token.set("statusmarkers", on);
+    }
+}
 
+function turn_off_marker_token(id, marker_name) {
+    var token = getObj('graphic',id);
+    var represents = token.get('represents');
+    if(represents) {
+        return turn_off_marker_character(represents, marker_name);
+    }
+    else {
+        var status = token.get("statusmarkers");
+        if( status.indexOf(marker_name) == -1 ) {
+            return;
+        }
+        var on = status.split(',');
+        var new_on = []
+        for(var item of on) {
+            if( item.indexOf(marker_name) == -1 ) {
+                new_on.push(item);
+            }
+        }
+        on = new_on.join(',');
+        token.set("statusmarkers", on);
+    }
+}
+
+function parse_character(character, data) {
     let set_string = {'traits'    : 'traits',
                       'alignment' : 'alignment',
                       'size'      : 'size',
@@ -650,6 +682,7 @@ function parse_character(character, data) {
 
     let set_int = {'level'     : 'level',
                    'speed'     : 'speed',
+                   'focuspoints' : 'focus_points',
                   };
 
     let set_value = {'ac' : 'armor_class',
@@ -683,31 +716,43 @@ function parse_character(character, data) {
                      'stealth' : 'stealth',
                      'survival' : 'survival',
                      'thievery' : 'thievery',
+                     'spellattack' : 'spell_attack',
+                     'spelldc' : 'spell_dc',
                     }
 
+    for( var key of Object.keys(set_value) ) {
+        set_attribute(character.id, set_value[key], '');
+    }
+    for( var key of Object.keys(set_int) ) {
+        set_attribute(character.id, set_int[key], '');
+    }
+
     //Let's delete all the strikes
-    delete_attacks(character.id, 'melee');
-    delete_attacks(character.id, 'ranged');
+    delete_repeating(character.id, 'repeating_melee-strikes');
+    delete_repeating(character.id, 'repeating_ranged-strikes');
+    delete_repeating(character.id, 'repeating_free-actions-reactions');
+    delete_repeating(character.id, 'repeating_actions-activities');
+    delete_repeating(character.id, 'repeating_normalspells');
+    delete_repeating(character.id, 'repeating_cantrip');
+    disable_spellcaster(character.id);
 
     for( var key of Object.keys(data) ) {
+
         if( key == 'name' ) {
             //This one isn't an attribute, it's special
             character.set('name', title_case(data[key]));
         }
         else if( key in set_string ) {
-            log('Got key ' + key + ' in set_string, value ' + data[key]);
             set_attribute(character.id, set_string[key], title_case(data[key]));
         }
         else if( key in set_int ) {
-            log('Got key ' + key + ' in set_int, value ' + data[key]);
             set_attribute(character.id, set_int[key], data[key]);
         }
         else if( key in set_value && data[key]['value'] != "") {
-            log('Got key ' + key + ' in set_value');
             set_attribute(character.id, set_value[key], data[key]['value']);
         }
 
-        if( key == 'strikes' ) {
+        else if( key == 'strikes' ) {
             for( var strike of data[key] ) {
                 let id = generate_row_id();
                 let stub = '';
@@ -732,6 +777,98 @@ function parse_character(character, data) {
                 set_attribute(character.id, stub + 'weapon_strike_damage_additional', damage.additional);
                 set_attribute(character.id, stub + 'toggles', 'display,');
             }
+        }
+
+        else if( key == 'specials' ) {
+            for(var special of data[key]) {
+                let id = generate_row_id();
+                let stub = '';
+                let action = special['actions'];
+                if( action == 'none' || action == 'reaction' || action == 'free' ) {
+                    //This should go in the automatic or reactive abilities sections
+                    stub = `repeating_free-actions-reactions_${id}_`
+                    let free_action = 0;
+                    let reaction = 0;
+                    if( action == 'reaction' ) {
+                        reaction = 'reaction';
+                    }
+                    else if( action == 'free' ) {
+                        free_action = 'free action';
+                    }
+                    set_attribute(character.id, stub + 'free_action', free_action);
+                    set_attribute(character.id, stub + 'reaction', reaction);
+                }
+                else if(action == 'one' ||
+                        action == 'two' ||
+                        action == 'three' ||
+                        action == '1 minute' ||
+                        action == '10 minutes') {
+                    stub = `repeating_actions-activities_${id}_`
+                    set_attribute(character.id, stub + 'actions', action);
+                }
+                else {
+                    continue;
+                }
+
+                let description = special['description'];
+                if( special['name'].toLowerCase() == 'attack of opportunity' && description == '' ) {
+                    description = 'You lash out at a foe that leaves an opening. Make a melee Strike against the triggering creature. If your attack is a critical hit and the trigger was a manipulate action, you disrupt that action. This Strike doesn’t count toward your multiple attack penalty, and your multiple attack penalty doesn’t apply to this Strike. ';
+                }
+                description.replace('&nbsp;','\n')
+                set_attribute(character.id, stub + 'name', special['name']);
+
+                set_attribute(character.id, stub + 'rep_traits', special['traits']);
+                set_attribute(character.id, stub + 'description', description);
+                set_attribute(character.id, stub + 'toggles', 'display,');
+            }
+        }
+        else if( key == 'spells' ) {
+            //We've got some spells. Firsty we need to turn on the spellcaster options.
+            var spells = false;
+            var cantrips = data['spells'][10] != undefined && data['spells'][10] != '';
+            var focusspells = data['focuspoints'] != undefined && data['spells'][10] != 0;
+            var innate = data['spelltype'] == 'innate';
+            if( !innate && data['morespells'] ) {
+                for( var i = 0; i < data['morespells'].length; i++) {
+                    if( data['morespells'][i]['name'] == 'innate' ) {
+                        innate = true;
+                        break;
+                    }
+                }
+            }
+
+            for(var i = 0; i < 11; i++) {
+                if( data['spells'][i] ) {
+                    spells = true;
+
+                    //We're throwing some spells in!
+                    let level = 10 - i;
+                    let stub = `repeating_normalspells_`;
+                    if( level == 0 ) {
+                        //cantrips
+                        stub = `repeating_cantrip_`;
+                        level = data['cantriplevel']
+                    }
+
+                    var spell_names = data['spells'][i].split(', ');
+                    for( var spell_name of spell_names ) {
+                        let id = generate_row_id();
+
+                        set_attribute(character.id, stub + `${id}_` + 'name', spell_name);
+                        set_attribute(character.id, stub + `${id}_` + 'current_level', level);
+                        set_attribute(character.id, stub + `${id}_` + 'toggles', 'display,');
+                    }
+                }
+            }
+            log('spells= ' + spells);
+            log('cantrips= ' + cantrips);
+            log('focusspells= ' + focusspells);
+            log('innate= ' + innate);
+
+            if( spells || cantrips || cantrips || innate) {
+                enable_spellcaster(character.id, spells, cantrips, focusspells, innate);
+            }
+
         }
     }
 
@@ -855,8 +992,7 @@ on("chat:message", function(msg) {
 
 });
 
-function delete_attacks(id, attack_type) {
-    let stub = `repeating_${attack_type}-strikes`
+function delete_repeating(id, stub) {
     const [IDs, attributes] = getRepeatingSectionAttrs(id,stub);
     for(var i in IDs) {
         var attrs = attributes[IDs[i]];
@@ -864,6 +1000,66 @@ function delete_attacks(id, attack_type) {
             attrs[name].remove();
         }
     }
+}
+var toggle_buttons = {'innate' : ['toggle_innate','innate'],
+                      'focus'  : ['toggle_focus','focus'],
+                      'cantrips' : ['toggle_cantrips', 'cantrips'],
+                      'normalspells' : ['toggle_normalspells', 'spells']};
+function disable_spellcaster(id) {
+    var toggles = get_attribute(id, 'toggles');
+    if( toggles == undefined || toggles == null ) {
+        set_attribute(id, 'toggles', '');
+        return;
+    }
+    log(`Initial toggles "${toggles}"`);
+
+    toggles = toggles.split(',')
+    var new_toggles = []
+    let ignore = ['npcspellcaster','innate','focus','cantrips','normalspells']
+
+    for(var toggle of toggles) {
+        log(toggle,ignore);
+        if( ignore.includes(toggle) ) {
+            //we're disabling this, so we'd better turn the button off if it has one
+            if( toggle in toggle_buttons ) {
+                set_attribute(id, toggle_buttons[toggle][0], 0);
+            }
+            continue;
+        }
+        new_toggles.push(toggle);
+    }
+    let toggle_string = new_toggles.join(',');
+
+    log(`Setting toggles to "${toggle_string}"`);
+    set_attribute(id, 'toggles', toggle_string);
+}
+
+function enable_spellcaster(id, spells, cantrips, focusspells, innate) {
+    var toggles = get_attribute(id, 'toggles');
+    if( toggles == undefined ) {
+        toggles = '';
+    }
+
+    log(`initial toggles "${toggles}"`);
+
+    let bools = [innate, focusspells, cantrips, spells];
+    let toggle_names = ['innate','focus','cantrips','normalspells']
+    let new_toggles = ['npcspellcaster'];
+
+    for( var i = 0; i < bools.length; i++) {
+        if( bools[i] ) {
+            new_toggles.push(toggle_names[i]);
+            set_attribute(id, toggle_buttons[toggle_names[i]][0], toggle_buttons[toggle_names[i]][1]);
+        }
+    }
+
+    let toggle_string = new_toggles.join(',');
+
+    if( toggles != '' ) {
+        toggle_string = toggles + ',' + toggle_string;
+    }
+    log(`setting toggles to "${toggle_string}"`);
+    set_attribute(id, 'toggles', toggle_string);
 }
 
 function add_attacks(id, roll_type, roll_num, attack_type, message) {
@@ -1176,3 +1372,21 @@ function show_save_buttons(msg) {
 function show_ability_check_buttons(msg) {
     return show_list_buttons(msg, 'Ability Checks', ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']);
 }
+
+on('change:campaign:turnorder', function() {
+    try {
+        var turnorder = Campaign().get("turnorder");
+        if(turnorder == "")
+            return;
+        turnorder = JSON.parse(turnorder);
+
+        //Get the person at the top of the order
+        log('jim');
+        log(turnorder[0]['id']);
+        turn_off_marker_token(turnorder[0]['id'], 'Reaction');
+    }
+    catch(err) {
+        log(err);
+        log('why');
+    }
+});
