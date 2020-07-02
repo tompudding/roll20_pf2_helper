@@ -1,3 +1,5 @@
+var module_name = 'PF2 Helper'
+
 function get_index(msg) {
     var roll_match = RegExp("\\$\\[\\[(\\d+)\\]\\]");
 
@@ -81,6 +83,12 @@ class Attack {
         this.damage_type = damage_type;
         this.extra_crit_damage = extra_crit_damage;
         this.die_result = die_result;
+        if( die_result == 20 ) {
+            play('critical_thread');
+        }
+        else if( die_result == 1 ) {
+            play('fan_fumble');
+        }
         if(to_hit) {
             this.roll = parse_roll(to_hit, die_result);
         }
@@ -177,13 +185,47 @@ function get_rolls(content, inlinerolls) {
             roll_info = undefined;
         }
         //At least for now; "damage_additional" doesn't store the type in the corresponding "info" field, it puts it after the roll index. Whatevs
+        var roll = null;
+        log('1');
         if(roll_name.match("additional")) {
-            if( roll_info == undefined ) {
-                roll_info = get_index_extra(results[1]);
+            //There can be multiple rolls here, each with the type afterwards. We want to break them down,
+            //total them up, and add the damage types to a string
+            let last_match = null;
+            let roll_re = RegExp("\\$\\[\\[(\\d+)\\]\\]","g");
+            let total_additional = 0;
+            let additional_types = [];
+            while(1) {
+
+                let match = roll_re.exec(results[1]);
+                if( null == match ) {
+                    //We're done, but there might be a final bit of info.
+                    if( last_match != null && last_match < results[1].length ) {
+                        additional_types.push( results[1].substring(last_match) );
+                    }
+                    break;
+                }
+                log('yo ' + last_match + ' mi= ' + match.index)
+                if( last_match != null && match.index != last_match ) {
+                    //There's in between stuff.
+                    additional_types.push( results[1].substring(last_match, match.index) );
+                }
+                last_match = roll_re.lastIndex;
+                let roll_index = parseInt(match[1], 10);
+                let value = inlinerolls[roll_index].results.total;
+                total_additional += value;
             }
+            log(additional_types);
+            roll_info = additional_types.join("");
+
+            //do between and stuff
+
+            //if( roll_info == undefined ) {
+            //    roll_info = get_index_extra(results[1]);
+            //}
             if( roll_type == 'damage') {
                 roll_type = 'damage_additional';
             }
+            roll = total_additional;
         }
 
 
@@ -192,8 +234,9 @@ function get_rolls(content, inlinerolls) {
             log("No roll index");
             break;
         }
-
-        var roll = inlinerolls[roll_index];
+        if( roll == null ) {
+            roll = inlinerolls[roll_index];
+        }
 
         rolls[roll_type] = {name:roll_name, roll:roll, type:roll_type, info:roll_info};
     }
@@ -216,9 +259,9 @@ class AttackRoll extends Roll {
         var die_result = rolls['attack'].roll.results.rolls[0].results[0].v
         var damage_type = rolls['damage'].info
         if('damage_additional' in rolls) {
-            damage += rolls['damage_additional'].roll.results.total;
+            damage += rolls['damage_additional'].roll;
             if(rolls['damage_additional'].info) {
-                damage_type += ' & ' + rolls['damage_additional'].info;
+                damage_type += ', ' + rolls['damage_additional'].info;
             }
         }
 
@@ -673,6 +716,33 @@ function turn_off_marker_token(id, marker_name) {
     }
 }
 
+function link_token_bars(character) {
+    var tokens = findObjs({type:'graphic', represents:character.id});
+
+    var hp    = findObjs({type : 'attribute', characterid:character.id, name:'hit_points'})[0];
+    var focus = findObjs({type : 'attribute', characterid:character.id, name:'focus_points'});
+    if( focus ) {
+        focus = focus[0];
+    }
+
+    for(var token of tokens) {
+        token.set('bar1_value', hp.get('current'));
+        token.set('bar1_max', hp.get('max'));
+
+        if( focus && focus.get('max') > 0 ) {
+            token.set('bar2_value', focus.get('current'));
+            token.set('bar2_max', focus.get('max'));
+        }
+    }
+}
+
+function play(title) {
+    var track = findObjs({type:'jukeboxtrack', title:title})[0];
+    if( track ) {
+        track.set({playing:true, softstop:false, loop:false});
+    }
+}
+
 function parse_character(character, data) {
     let set_string = {'traits'    : 'traits',
                       'alignment' : 'alignment',
@@ -680,44 +750,43 @@ function parse_character(character, data) {
                       'type'      : 'npc_type',
                      };
 
-    let set_int = {'level'     : 'level',
-                   'speed'     : 'speed',
+    let set_int = {'level'       : 'level',
+                   'speed'       : 'speed',
                    'focuspoints' : 'focus_points',
                   };
 
-    let set_value = {'ac' : 'armor_class',
-                     'hp' : 'hit_points',
-                     'fortitude' : 'saving_throws_fortitude',
-                     'reflex' : 'saving_throws_reflex',
-                     'will' : 'saving_throws_will',
-                     'resistance' : 'resistances',
-                     'immunity' : 'immunities',
-                     'weakness' : 'weaknesses',
-                     'strength' : 'strength_modifier',
-                     'dexterity' : 'dexterity_modifier',
+    let set_value = {'ac'           : 'armor_class',
+                     'hp'           : 'hit_points',
+                     'fortitude'    : 'saving_throws_fortitude',
+                     'reflex'       : 'saving_throws_reflex',
+                     'will'         : 'saving_throws_will',
+                     'resistance'   : 'resistances',
+                     'immunity'     : 'immunities',
+                     'weakness'     : 'weaknesses',
+                     'strength'     : 'strength_modifier',
+                     'dexterity'    : 'dexterity_modifier',
                      'constitution' : 'constitution_modifier',
                      'intelligence' : 'intelligence_modifier',
-                     'wisdom' : 'wisdom_modifier',
-                     'charisma' : 'charisma_modifier',
-                     'perception' : 'perception',
-                     'acrobatics' : 'acrobatics',
-                     'arcana' : 'arcana',
-                     'athletics' : 'athletics',
-                     'crafting' : 'crafting',
-                     'deception' : 'deception',
-                     'diplomacy' : 'diplomacy',
+                     'wisdom'       : 'wisdom_modifier',
+                     'charisma'     : 'charisma_modifier',
+                     'acrobatics'   : 'acrobatics',
+                     'arcana'       : 'arcana',
+                     'athletics'    : 'athletics',
+                     'crafting'     : 'crafting',
+                     'deception'    : 'deception',
+                     'diplomacy'    : 'diplomacy',
                      'intimidation' : 'intimidation',
-                     'medicine' : 'medicine',
-                     'nature' : 'nature',
-                     'occultism' : 'occultism',
-                     'performance' : 'performance',
-                     'religion' : 'religion',
-                     'society' : 'society',
-                     'stealth' : 'stealth',
-                     'survival' : 'survival',
-                     'thievery' : 'thievery',
-                     'spellattack' : 'spell_attack',
-                     'spelldc' : 'spell_dc',
+                     'medicine'     : 'medicine',
+                     'nature'       : 'nature',
+                     'occultism'    : 'occultism',
+                     'performance'  : 'performance',
+                     'religion'     : 'religion',
+                     'society'      : 'society',
+                     'stealth'      : 'stealth',
+                     'survival'     : 'survival',
+                     'thievery'     : 'thievery',
+                     'spellattack'  : 'spell_attack',
+                     'spelldc'      : 'spell_dc',
                     }
 
     for( var key of Object.keys(set_value) ) {
@@ -741,6 +810,13 @@ function parse_character(character, data) {
         if( key == 'name' ) {
             //This one isn't an attribute, it's special
             character.set('name', title_case(data[key]));
+        }
+        else if( key == 'perception' ) {
+            //This one is a bit odd as it has a notes field that sets senses
+            set_attribute(character.id, 'perception', data[key]['value']);
+            if( data[key]['note'] ) {
+                set_attribute(character.id, 'senses', data[key]['note']);
+            }
         }
         else if( key in set_string ) {
             set_attribute(character.id, set_string[key], title_case(data[key]));
@@ -868,26 +944,76 @@ function parse_character(character, data) {
             if( spells || cantrips || cantrips || innate) {
                 enable_spellcaster(character.id, spells, cantrips, focusspells, innate);
             }
+            set_attribute(character.id, 'sort_normalspells', 'level');
 
         }
     }
-
-    //var id = generate_row_id();
-
-    //var attrs = ['weapon_strike','weapon_traits','weapon','weapon_strike_damage','weapon_strike_damage_type','roll_critical_damage_npc'];
-
-    //for(var attr of attrs) {
-    //    log(`repeating_melee-strikes_${id}_${attr}`);
-    //    set_attribute(character.id, `repeating_melee-strikes_${id}_${attr}`, 'bobbins');
-    //    //createObj("attribute", {name:attr_name, current:value, max:value, characterid: id});
-    //}
-
 }
 
 // The GM notes fields seems to sometimes have some html fields at the start. Let's clean it up by removing
 // everything before the first opening and closing braces
 function clean_json(input) {
-    return RegExp('[^{]*({.*})[^}]*').exec(input)[1];
+    var json = RegExp('[^{]*({.*})[^}]*').exec(input);
+
+    if( json ) {
+        return json[1];
+    }
+
+    return null;
+}
+
+function load_pdf_data(input) {
+    input = input.replace(/&nbsp;/g,' ')
+    input = input.replace(/(<p[^>]+?>|<p>)/ig, "");
+    lines = input.split(/<\/p>/ig);
+
+    //The name should be the first line
+    output = {name : title_case(lines[0].trim())}
+
+    matchers = [
+        { re   : RegExp('.*CREATURE\\s+(\\d+)\\s*(.*)','ig'),
+          func : (match) => {
+              log('creature feature');
+              output.level = parseInt(match[1]);
+              output.traits = match[2].split(/[ ,]+/).join(", ");
+          },
+        },
+        { re   : RegExp('.*Perception\\s+\\+?(\\d+);?\\s*(.*)','ig'),
+          func : (match) => {
+              senses = '';
+              if( match[2] ) {
+                  senses = match[2].trim();
+              }
+              output.perception = {value : parseInt(match[1]),
+                                   note  : senses
+                                  }
+          },
+        },
+    ]
+
+    for(var line of lines.slice(1)) {
+        //We allow the lines to come in any order, and decide what to do with it based on its content
+        line = line.trim();
+        log(line);
+        let remove = null;
+        for( var i = 0; i < matchers.length; i++) {
+            match = matchers[i].re.exec(line);
+            if( match ) {
+                matchers[i].func(match);
+                remove = i;
+                break;
+            }
+        }
+        if( remove != null ) {
+            matchers.splice(remove, 1);
+        }
+        if( matchers.length == 0 ) {
+            log('all removed');
+            break;
+        }
+    }
+    log(output);
+    return output;
 }
 
 function get_and_parse_character(msg) {
@@ -904,11 +1030,40 @@ function get_and_parse_character(msg) {
         'gmnotes',
         (notes) => {
             try {
-                parse_character(character, JSON.parse(clean_json(notes)));
+                let json = clean_json(notes);
+                let name = 'unknown';
+                let format = 'none';
+                if( json ) {
+                    parse_json_character(character, JSON.parse(json));
+                    format = 'JSON'
+
+                }
+                else {
+                    data = load_pdf_data(notes);
+                    if( data ) {
+                        parse_character(character, data);
+                        format = 'PDF';
+                    }
+                    else {
+                        //That was our last hope
+                        throw "Failed to parse in PDF or JSON format";
+                    }
+                }
+                name = character.get('name');
+                sendChat(module_name, `/w gm Character ${name} parsed successfully using ${format} format`)
             }
             catch(err) {
                 log('got error + ' + err);
-                character.set('name',String(err));
+                sendChat(module_name, '/w gm Error while parsing character' + String(err));
+            }
+
+            //Whatever the result, we always try to set the hit point and focus bars for the selected token
+            try {
+                link_token_bars(character);
+            }
+            catch(err) {
+                log('got error while linking tokens ' + err);
+                sendChat(module_name, '/w gm Error while linking token' + String(err));
             }
         }
     );
@@ -947,8 +1102,9 @@ function handle_whisper(msg) {
         return;
     }
     //log('whisper');
-    //log(msg.content);
-    //log(msg.inlinerolls);
+    log(msg.content);
+    log(msg.inlinerolls);
+    log('***')
     //log(msg.playerid);
     //log(msg.target);
     //log(msg.rolltemplate);
@@ -975,6 +1131,15 @@ function handle_whisper(msg) {
     sendChat('GM', roll.format());
 }
 
+function handle_general(msg) {
+    //We only want to do this for player rolls
+    if(undefined == msg.inlinerolls || msg.playerid == 'API') {
+        return;
+    }
+    if(msg.content.match('{{roll01_type=attack')) {
+        roll = new AttackRoll(msg.content, msg.inlinerolls);
+    }
+}
 
 on("chat:message", function(msg) {
   //This allows players to enter !sr <number> to roll a number of d6 dice with a target of 4.
@@ -984,6 +1149,9 @@ on("chat:message", function(msg) {
         }
         else if(msg.type == "api") {
             return handle_api(msg);
+        }
+        else if(msg.type == 'general') {
+            return handle_general(msg);
         }
     }
     catch(err) {
@@ -1017,13 +1185,13 @@ function disable_spellcaster(id) {
     var new_toggles = []
     let ignore = ['npcspellcaster','innate','focus','cantrips','normalspells']
 
+    for( var toggle of Object.keys(toggle_buttons) ) {
+        set_attribute(id, toggle_buttons[toggle][0], 0);
+    }
+
     for(var toggle of toggles) {
         log(toggle,ignore);
         if( ignore.includes(toggle) ) {
-            //we're disabling this, so we'd better turn the button off if it has one
-            if( toggle in toggle_buttons ) {
-                set_attribute(id, toggle_buttons[toggle][0], 0);
-            }
             continue;
         }
         new_toggles.push(toggle);
@@ -1062,6 +1230,63 @@ function enable_spellcaster(id, spells, cantrips, focusspells, innate) {
     set_attribute(id, 'toggles', toggle_string);
 }
 
+function add_forceful(damage) {
+    let new_damage = damage.get('current');
+    if( typeof(new_damage) == 'number' ) {
+        new_damage = new_damage.toString();
+    }
+
+    if( new_damage.indexOf('?{Attack') != -1 ) {
+        return null;
+    }
+
+    if(false == new_damage.endsWith('+')) {
+        new_damage += '+';
+    }
+
+    //The damage dice is hopefully the first dice expression in there
+    let damage_dice = RegExp('(\\d+)d\\d+','ig').exec(new_damage);
+    if( null == damage_dice ) {
+        //There's nothing to add if the attack for some reason doesn't have any damage dice
+        return null;
+    }
+    damage_dice = parseInt(damage_dice[1]);
+
+    new_damage += `[[?{Attack|1st,0|2nd,1|3rd+,2}*${damage_dice}]][Forceful]`;
+    return new_damage;
+}
+
+function add_sweep(attack) {
+    let new_attack = attack.get('current');
+    if( typeof(new_attack) == 'number' ) {
+        new_attack = new_attack.toString();
+    }
+
+    if( new_attack.indexOf('?{First Target Attacked?') != -1 ) {
+        return null;
+    }
+
+    if(false == new_attack.endsWith('+')) {
+        new_attack += '+';
+    }
+
+    new_attack += `?{First Target Attacked?|Yes,0|No,1}[Sweep]`;
+    return new_attack;
+}
+
+// Damage here is a string which may include dialogue box elements that we want to remove. They are always at
+// the end though so it's fairly easy
+
+function format_damage_for_display(damage) {
+    let match = RegExp('\\s*\\+\\s*\\[\\[\\?{','ig').exec(damage);
+
+    if( match == null  ){
+        return damage;
+    }
+
+    return damage.substring(0, match.index);
+}
+
 function add_attacks(id, roll_type, roll_num, attack_type, message) {
     message.push(`{{roll0${roll_num}_name=${attack_type}}} `);
     //var num_attacks = getRepeatingSectionCounts(id,`repeating_${attack_type}-strikes`);
@@ -1097,7 +1322,14 @@ function add_attacks(id, roll_type, roll_num, attack_type, message) {
         }
         let damage = attrs['weapon_strike_damage'];
         if(damage) {
-            damage = damage.get('current');
+            if( traits.toLowerCase().includes('forceful') ) {
+                //We want to add a bonus to damage
+                let new_damage = add_forceful(damage);
+                if( new_damage ) {
+                    damage.set('current',new_damage);
+                }
+            }
+            damage = format_damage_for_display(damage.get('current'));
         }
         else {
             damage = "";
@@ -1112,33 +1344,43 @@ function add_attacks(id, roll_type, roll_num, attack_type, message) {
         //let bonus = getAttrByName(id, `repeating_${attack_type}-strikes_$${i}_weapon_strike`);
         //let traits = getAttrByName(id, `repeating_${attack_type}-strikes_$${i}_weapon_traits`);
 
-        //&{template:rolls}  {{charactername=@{character_name}}} {{header=@{weapon}}} {{subheader=^{melee_strike}}} {{notes_show=@{roll_show_notes}}} {{notes=@{weapon_notes}}} @{weapon_roll_npc} @{damage_roll_npc} @{damage_critical_roll_npc} @{damage_additional_roll_npc}
+        //&{template:rolls} {{charactername=@{character_name}}} {{header=@{weapon}}}
+        //{{subheader=^{melee_strike}}} {{notes_show=@{roll_show_notes}}} {{notes=@{weapon_notes}}}
+        //@{weapon_roll_npc} @{damage_roll_npc} @{damage_critical_roll_npc} @{damage_additional_roll_npc}
+
         if(bonus) {
             let new_bonus = bonus.get('current');
             if( typeof(new_bonus) == 'number' ) {
                 new_bonus = new_bonus.toString();
             }
             //At this point we can check if the macro has been added to the weapon strike, and update it if not!
-            if( new_bonus.indexOf('?{') == -1 ) {
-                //This means we take the bonus as correct and update the weapon strike with our macro, but we first need to check if agile is one of the traits
+            if( new_bonus.indexOf('?{Attack') == -1 ) {
+                //This means we take the bonus as correct and update the weapon strike with our macro, but we
+                //first need to check if agile is one of the traits
                 if(false == new_bonus.endsWith('+')) {
                     new_bonus += '+';
                 }
-                let map=5;
+                let map = 5;
                 if( traits.toLowerCase().includes('agile') ) {
                     map = 4;
                 }
                 let pen_2 = -map;
                 let pen_3 = -2*map;
-                new_bonus += `?{MAP|1st,0|2nd ${pen_2},${pen_2}|3rd+ ${pen_3},${pen_3}}`
+                new_bonus += `[[?{Attack|1st,0|2nd ${pen_2},1|3rd+ ${pen_3},2}*(-${map})]][MAP]`
                 bonus.set('current',new_bonus);
-                //set_attribute(id, `repeating_${attack_type}-strikes_$${i}_weapon_strike`, new_bonus);
             }
-
+        }
+        if( traits.toLowerCase().includes('sweep') ) {
+            let new_bonus = add_sweep(bonus);
+            if( new_bonus ) {
+                bonus.set('current', new_bonus);
+            }
+        }
+        if( bonus ) {
             //now bonus has been updated to include the macro, we need a text version of it that starts with a +
-            var bonus_match = bonus_matcher.exec(new_bonus);
+            var bonus_match = bonus_matcher.exec(bonus.get('current'));
             bonus = "0";
-            if(bonus_match.length > 1) {
+            if(bonus_match && bonus_match.length > 1) {
                 bonus = bonus_match[1];
             }
         }
@@ -1165,6 +1407,8 @@ function show_attack_buttons(msg) {
 
     i = add_attacks(id, 'info', i, 'melee', message);
     add_attacks(id, 'info', i, 'ranged', message);
+
+    log(message.join(" "));
 
     sendChat('GM', message.join(" ") );
 }
@@ -1223,7 +1467,7 @@ function add_full_spells(id, spell_type, spell_type_name, message) {
         else {
             name = "";
         }
-        let level = attrs['spelllevel'];
+        let level = attrs['current_level'];
         if(level) {
             level = level.get('current');
         }
@@ -1349,13 +1593,14 @@ function show_list_buttons(msg, list_name, list) {
     var id = RegExp("{{id=([^}]*)}}").exec(msg.content)[1];
     var name = getAttrByName(id, 'character_name');
 
-    var message = [`/w ${msg.who} &{template:rolls} {{header=${name} ${list_name}}} {{roll01=`]
+    var message = [`/w ${msg.who} &{template:rolls} {{header=${name} ${list_name}}} {{desc=`]
 
     for(var i in list) {
         message.push(`[${list[i]}](!&#13;&#37;{selected|${list[i]}})`);
     }
+    message = message.join(" ") + '}}';
 
-    sendChat('GM', message.join(" ") + '}}');
+    sendChat('GM', message);
 }
 
 function show_skills_buttons(msg) {
@@ -1388,5 +1633,17 @@ on('change:campaign:turnorder', function() {
     catch(err) {
         log(err);
         log('why');
+    }
+});
+
+on('change:campaign:initiativepage', function() {
+    try {
+        var turnorder_visible = Campaign().get("initiativepage");
+        if( turnorder_visible ) {
+            play('roll_for_initiative');
+        }
+    }
+    catch(err) {
+        log(err);
     }
 });
