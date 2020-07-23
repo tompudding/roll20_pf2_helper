@@ -992,9 +992,27 @@ function clean_json(input) {
     return null;
 }
 
+function is_upper_case(str) {
+    return str == str.toUpperCase() && str != str.toLowerCase();
+}
+
+function is_lower_case(str) {
+    return str == str.toLowerCase() && str != str.toUpperCase();
+}
+
+function is_title_case(words) {
+    for( var word of words ) {
+        if( false == is_upper_case(word[0]) || (word.length > 1 && false == is_lower_case(word.slice(1))) ) {
+            return false;
+        }
+    }
+    return true;
+}
+
+
 function load_pdf_data(input) {
     input = input.replace(/&nbsp;/g,' ')
-    input = input.replace(/(<p[^>]+?>|<p>)/ig, "");
+    input = input.replace(/(<p[^>]+?>|<p>|<div>|<\/div>)/ig, "");
     lines = input.split(/<\/p>|<br>/ig);
 
     //The name should be the first line
@@ -1006,7 +1024,7 @@ function load_pdf_data(input) {
     output = {name : name};
 
     matchers = [
-        { re   : RegExp('.*CREATURE\\s+(\\d+)\\s*(.*)','ig'),
+        { re   : RegExp('^.*CREATURE\\s+(\\d+)\\s*(.*)','ig'),
           func : (match) => {
               log('creature feature');
               output.level = parseInt(match[1]);
@@ -1023,7 +1041,7 @@ function load_pdf_data(input) {
           },
           name : 'trait',
         },
-        { re   : RegExp('.*Perception\\s+\\+?(\\d+);?\\s*(.*)','ig'),
+        { re   : RegExp('^.*Perception\\s+\\+?(\\d+);?\\s*(.*)','ig'),
           func : (match) => {
               senses = '';
               if( match[2] ) {
@@ -1035,7 +1053,7 @@ function load_pdf_data(input) {
           },
           name : 'perception',
         },
-        { re : RegExp('Languages\\s+(.*)'),
+        { re : RegExp('^Languages\\s+(.*)'),
           func : (match) => {
               log('Got languages');
               //TODO: Split the list
@@ -1043,54 +1061,55 @@ function load_pdf_data(input) {
           },
           name : 'languages',
         },
-        { re : RegExp('Skills\\s+(.*)'),
+        { re : RegExp('^Skills\\s+(.*)'),
           func : (match) => {log('skills')},
           name : 'skills',
         },
         // It would be nice to parse all the attributes now, but sometimes they wrap multiple lines so we'd
         // best just do the first one
-        { re : RegExp('Str ([+-]\\d+).*'),
+        { re : RegExp('^Str ([+-]\\d+).*'),
           func : (match) => {log('attributes')},
           name : 'attributes',
         },
-        { re : RegExp('Items\\s*(.*)'),
+        { re : RegExp('^Items\\s*(.*)'),
           func : (match) => {log('items')},
           name : 'items',
         },
         //For the saves line we're expecting something of the form AC [number]; Fort +/-[number] (possible
         //note for the save), Ref +/[number] (possible note for the save)
-        { re : RegExp('AC\\s*(\\d+);\\s*Fort\\s*[+-]?(\\d+)\\s*(\\((.*?)\\))?,\\s*Ref\\s*[+-]?(\\d+)\\s*(\\((.*?)\\))?,\\s*Will\\s*[+-]?(\\d+)\\s*(\\((.*?)\\))?;?\\s*\\s*(.*)',"i"),
+        { re : RegExp('^AC\\s*(\\d+);\\s*Fort\\s*[+-]?(\\d+)\\s*(\\((.*?)\\))?,\\s*Ref\\s*[+-]?(\\d+)\\s*(\\((.*?)\\))?,\\s*Will\\s*[+-]?(\\d+)\\s*(\\((.*?)\\))?;?\\s*\\s*(.*)',"i"),
           func : (match) => {log('Saves');},
           name : 'saves',
         },
         // The HP line can have weaknesses, resistances and immunities, but I suspect some monsters will get printed at some point with those things in a different order, so we'll put it out in more than one regexp
-        { re : RegExp('HP\\s*(\\d+).*','i'),
+        { re : RegExp('^HP\\s*(\\d+).*','i'),
           func : (match) => {log('HP and defences');},
           name : 'hp',
         },
         // The speeds also needn't be in order
-        { re : RegExp('Speed\\s*((\\d+) feet)?.*','i'),
+        { re : RegExp('^Speed\\s*((\\d+) feet)?.*','i'),
           func : (match) => {log('speeds');},
           name : 'speeds',
         },
-
+    ];
+    multi_matchers = [
         //Next we're into looking at abilities. We can find simple attacks as they start with "Melee" or "Ranged"
-        { re : RegExp('Melee\\s*.*','i'),
+        { re : RegExp('^Melee\\s*.*','i'),
           func : (match) => {log('melee');},
           name : 'melee',
         },
-        { re : RegExp('Ranged\\s*.*','i'),
+        { re : RegExp('^Ranged\\s*.*','i'),
           func : (match) => {log('ranged');},
           name : 'ranged',
         },
         //Via some PDF magic it seems that we get action symbols translated into cool "[one-action]" type text which we can use. It doesn't help us if it's a passive ability, but it helps with a lot of things
-        { re : RegExp('.*(\\[one-action\\]|\\[two-actions\\]|\\[three-actions\\]|\\[reaction\\]|\\[free-action\\]).*'),
+        { re : RegExp('^.*(\\[one-action\\]|\\[two-actions\\]|\\[three-actions\\]|\\[reaction\\]|\\[free-action\\]).*'),
           func : (match) => {log('action');},
           name : 'action',
         },
 
         //Poisons and diseases don't have the action symbol (as they're usually delivered by some other mechanism), but they should have a list of traits, one of which will be poison or disease.
-        { re : RegExp('.*(\\([^\\)]*(poison|disease).*\\)).*'),
+        { re : RegExp('^.*(\\([^\\)]*(poison|disease).*\\)).*'),
           func : (match) => {log('affliction');},
           name : 'affliction',
         },
@@ -1117,12 +1136,46 @@ function load_pdf_data(input) {
                 break;
             }
         }
+        if( null == match ) {
+            for( var i = 0; i < multi_matchers.length; i++) {
+                match = multi_matchers[i].re.exec(line);
+                if( match ) {
+                    break;
+                }
+            }
+        }
 
         if( null == match ) {
             // It didn't match anything, but there's still a chance it might be starting a block. I think the
             // only way to tell here is to look at if the first two words are in title case. TODO: that
-            current_lines.push(line);
-            continue;
+            let words = line.split(' ');
+            log(words)
+            log(words.slice(0, 2))
+            log(words.length < 2);
+            log(is_title_case(words.slice(2)));
+            var possible_ability = words.length > 2;
+            if( possible_ability ) {
+                if( words[0] == 'Critical' && (words[1] =='Success' || words[1] == 'Failure') ) {
+                    possible_ability = false;
+                }
+            }
+
+            if( possible_ability && (words[0] == 'Success' || words[0] == 'Failure' )) {
+                // This is less clear because an ability could be called "Success Magnet" or something, but
+                // for now let's assume these are part of a block. We could check that adjacent lines had
+                // critical in them
+                possible_ability = false;
+            }
+
+            if( possible_ability && false == is_title_case(words.slice(0, 2)) ) {
+                possible_ability = false;
+            }
+            if( false == possible_ability ) {
+                log('bazoo')
+                current_lines.push(line);
+                continue;
+            }
+            log('kazoo')
         }
 
         //If we get here we have a match so this is starting a block. All preceding lines should be merged onto one
