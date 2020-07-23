@@ -743,7 +743,7 @@ function play(title) {
     }
 }
 
-function parse_character(character, data) {
+function parse_json_character(character, data) {
     let set_string = {'traits'    : 'traits',
                       'alignment' : 'alignment',
                       'size'      : 'size',
@@ -789,6 +789,11 @@ function parse_character(character, data) {
                      'spelldc'      : 'spell_dc',
                     }
 
+    var spells      = false;
+    var cantrips    = false;
+    var focusspells = false;
+    var innate      = false;
+
     for( var key of Object.keys(set_value) ) {
         set_attribute(character.id, set_value[key], '');
     }
@@ -802,6 +807,8 @@ function parse_character(character, data) {
     delete_repeating(character.id, 'repeating_free-actions-reactions');
     delete_repeating(character.id, 'repeating_actions-activities');
     delete_repeating(character.id, 'repeating_normalspells');
+    delete_repeating(character.id, 'repeating_spellinnate');
+    delete_repeating(character.id, 'repeating_spellfocus');
     delete_repeating(character.id, 'repeating_cantrip');
     disable_spellcaster(character.id);
 
@@ -898,55 +905,78 @@ function parse_character(character, data) {
                 set_attribute(character.id, stub + 'toggles', 'display,');
             }
         }
-        else if( key == 'spells' ) {
+        else if( key == 'spells' || key == 'morespells' ) {
             //We've got some spells. Firsty we need to turn on the spellcaster options.
-            var spells = false;
-            var cantrips = data['spells'][10] != undefined && data['spells'][10] != '';
-            var focusspells = data['focuspoints'] != undefined && data['spells'][10] != 0;
-            var innate = data['spelltype'] == 'innate';
-            if( !innate && data['morespells'] ) {
-                for( var i = 0; i < data['morespells'].length; i++) {
-                    if( data['morespells'][i]['name'] == 'innate' ) {
-                        innate = true;
-                        break;
+            if( key == 'spells' ) {
+                var spell_data = [data];
+                var spell_type = data['spelltype'];
+            }
+            else {
+                var spell_data = data['morespells'];
+                var spell_type = spell_data['name'];
+                // The input can have a different DC and attack roll here, but the roll20 sheet doesn't
+                // support it so we ignore it
+            }
+            if( spell_type ) {
+                spell_type = spell_type.toLowerCase();
+            }
+            for( var spell_datum of spell_data ) {
+                var this_focus = spell_datum['focuspoints'] != undefined && spell_datum['focuspoints'] != '';
+
+                var stub = `repeating_normalspells_`;
+                if( this_focus ) {
+                    // If they cost focus points we put them in the focus spells section
+                    stub = 'repeating_spellfocus_';
+                }
+                else if (spell_type == 'innate') {
+                    stub = 'repeating_spellinnate_';
+                }
+
+                for(var i = 0; i < 11; i++) {
+                    if( spell_datum['spells'][i] ) {
+                        spells = true;
+
+                        //We're throwing some spells in!
+                        let level = 10 - i;
+                        let this_stub = stub;
+                        if( level == 0 ) {
+                            //cantrips
+                            this_stub = `repeating_cantrip_`;
+                            level = spell_datum['cantriplevel']
+                            cantrips = true;
+                        }
+                        if( spell_type == 'innate' ) {
+                            innate = true;
+                        }
+                        else if( this_focus ) {
+                            focusspells = true;
+                        }
+
+                        var spell_names = spell_datum['spells'][i].split(', ');
+                        for( var spell_name of spell_names ) {
+                            if( spell_name.trim() == '' ) {
+                                continue;
+                            }
+                            let id = generate_row_id();
+                            set_attribute(character.id, this_stub + `${id}_` + 'name', spell_name);
+                            set_attribute(character.id, this_stub + `${id}_` + 'current_level', level);
+                            set_attribute(character.id, this_stub + `${id}_` + 'toggles', 'display,');
+                        }
                     }
                 }
             }
-
-            for(var i = 0; i < 11; i++) {
-                if( data['spells'][i] ) {
-                    spells = true;
-
-                    //We're throwing some spells in!
-                    let level = 10 - i;
-                    let stub = `repeating_normalspells_`;
-                    if( level == 0 ) {
-                        //cantrips
-                        stub = `repeating_cantrip_`;
-                        level = data['cantriplevel']
-                    }
-
-                    var spell_names = data['spells'][i].split(', ');
-                    for( var spell_name of spell_names ) {
-                        let id = generate_row_id();
-
-                        set_attribute(character.id, stub + `${id}_` + 'name', spell_name);
-                        set_attribute(character.id, stub + `${id}_` + 'current_level', level);
-                        set_attribute(character.id, stub + `${id}_` + 'toggles', 'display,');
-                    }
-                }
-            }
-            log('spells= ' + spells);
-            log('cantrips= ' + cantrips);
-            log('focusspells= ' + focusspells);
-            log('innate= ' + innate);
-
-            if( spells || cantrips || cantrips || innate) {
-                enable_spellcaster(character.id, spells, cantrips, focusspells, innate);
-            }
-            set_attribute(character.id, 'sort_normalspells', 'level');
-
         }
+    }
+
+    //Turn on spellcaster stuff if there was any
+    log('spells= ' + spells);
+    log('cantrips= ' + cantrips);
+    log('focusspells= ' + focusspells);
+    log('innate= ' + innate);
+
+    if( spells || cantrips || cantrips || innate) {
+        enable_spellcaster(character.id, spells, cantrips, focusspells, innate);
+        set_attribute(character.id, 'sort_normalspells', 'level');
     }
 }
 
@@ -965,10 +995,15 @@ function clean_json(input) {
 function load_pdf_data(input) {
     input = input.replace(/&nbsp;/g,' ')
     input = input.replace(/(<p[^>]+?>|<p>)/ig, "");
-    lines = input.split(/<\/p>/ig);
+    lines = input.split(/<\/p>|<br>/ig);
 
     //The name should be the first line
-    output = {name : title_case(lines[0].trim())}
+    let bracket_index = /\s*\(\s*\d+\s*\)/g.exec(lines[0]);
+    let name = lines[0].trim();
+    if( bracket_index ) {
+        name = lines[0].substring(0, bracket_index.index);
+    }
+    output = {name : name};
 
     matchers = [
         { re   : RegExp('.*CREATURE\\s+(\\d+)\\s*(.*)','ig'),
@@ -977,6 +1012,16 @@ function load_pdf_data(input) {
               output.level = parseInt(match[1]);
               output.traits = match[2].split(/[ ,]+/).join(", ");
           },
+          name : 'level',
+        },
+        // After creature we can get traits which are all caps
+        { re   : RegExp('^\\s*[A-Z\\s]*$',''),
+          func : (match) => {
+              log('trait');
+              //output.level = parseInt(match[1]);
+              //output.traits = match[2].split(/[ ,]+/).join(", ");
+          },
+          name : 'trait',
         },
         { re   : RegExp('.*Perception\\s+\\+?(\\d+);?\\s*(.*)','ig'),
           func : (match) => {
@@ -988,19 +1033,130 @@ function load_pdf_data(input) {
                                    note  : senses
                                   }
           },
+          name : 'perception',
+        },
+        { re : RegExp('Languages\\s+(.*)'),
+          func : (match) => {
+              log('Got languages');
+              //TODO: Split the list
+              output.languages = match[1].trim();
+          },
+          name : 'languages',
+        },
+        { re : RegExp('Skills\\s+(.*)'),
+          func : (match) => {log('skills')},
+          name : 'skills',
+        },
+        // It would be nice to parse all the attributes now, but sometimes they wrap multiple lines so we'd
+        // best just do the first one
+        { re : RegExp('Str ([+-]\\d+).*'),
+          func : (match) => {log('attributes')},
+          name : 'attributes',
+        },
+        { re : RegExp('Items\\s*(.*)'),
+          func : (match) => {log('items')},
+          name : 'items',
+        },
+        //For the saves line we're expecting something of the form AC [number]; Fort +/-[number] (possible
+        //note for the save), Ref +/[number] (possible note for the save)
+        { re : RegExp('AC\\s*(\\d+);\\s*Fort\\s*[+-]?(\\d+)\\s*(\\((.*?)\\))?,\\s*Ref\\s*[+-]?(\\d+)\\s*(\\((.*?)\\))?,\\s*Will\\s*[+-]?(\\d+)\\s*(\\((.*?)\\))?;?\\s*\\s*(.*)',"i"),
+          func : (match) => {log('Saves');},
+          name : 'saves',
+        },
+        // The HP line can have weaknesses, resistances and immunities, but I suspect some monsters will get printed at some point with those things in a different order, so we'll put it out in more than one regexp
+        { re : RegExp('HP\\s*(\\d+).*','i'),
+          func : (match) => {log('HP and defences');},
+          name : 'hp',
+        },
+        // The speeds also needn't be in order
+        { re : RegExp('Speed\\s*((\\d+) feet)?.*','i'),
+          func : (match) => {log('speeds');},
+          name : 'speeds',
+        },
+
+        //Next we're into looking at abilities. We can find simple attacks as they start with "Melee" or "Ranged"
+        { re : RegExp('Melee\\s*.*','i'),
+          func : (match) => {log('melee');},
+          name : 'melee',
+        },
+        { re : RegExp('Ranged\\s*.*','i'),
+          func : (match) => {log('ranged');},
+          name : 'ranged',
+        },
+        //Via some PDF magic it seems that we get action symbols translated into cool "[one-action]" type text which we can use. It doesn't help us if it's a passive ability, but it helps with a lot of things
+        { re : RegExp('.*(\\[one-action\\]|\\[two-actions\\]|\\[three-actions\\]|\\[reaction\\]|\\[free-action\\]).*'),
+          func : (match) => {log('action');},
+          name : 'action',
+        },
+
+        //Poisons and diseases don't have the action symbol (as they're usually delivered by some other mechanism), but they should have a list of traits, one of which will be poison or disease.
+        { re : RegExp('.*(\\([^\\)]*(poison|disease).*\\)).*'),
+          func : (match) => {log('affliction');},
+          name : 'affliction',
         },
     ]
+    matches = {};
+
+    let final_lines = [];
+    let current_lines = [];
 
     for(var line of lines.slice(1)) {
-        //We allow the lines to come in any order, and decide what to do with it based on its content
+        // Sometimes when copying from a pdf we get a number on a line on its own, I'm not sure why.
+        if( /^\s*\d+\s*$/.exec(line) ) {
+            continue;
+        }
         line = line.trim();
-        log(line);
+        if( !line ) {
+            continue;
+        }
+        let match = null;
+        // Next we check to see if it matches any of our special matchers
+        for( var i = 0; i < matchers.length; i++) {
+            match = matchers[i].re.exec(line);
+            if( match ) {
+                break;
+            }
+        }
+
+        if( null == match ) {
+            // It didn't match anything, but there's still a chance it might be starting a block. I think the
+            // only way to tell here is to look at if the first two words are in title case. TODO: that
+            current_lines.push(line);
+            continue;
+        }
+
+        //If we get here we have a match so this is starting a block. All preceding lines should be merged onto one
+        if( current_lines.length > 0 ) {
+            final_lines.push( current_lines.join(" ") );
+        }
+        current_lines = [line];
+    }
+    if( current_lines.length > 0 ) {
+        final_lines.push( current_lines.join(" ") );
+    }
+
+    // The first pass will be to fold lines together so we have one line for each thing. The only difficult part to that is special abilities that don't have an action because we can't match on an initial keyword and we lose the bold in the next form. We'll try using if the first n words are capitalized and
+    lines = final_lines;
+    log('beep ***');
+    log(lines);
+    return null;
+
+    for(var line of lines.slice(1)) {
+        // We take each line on its own, and decide what to do with it based on its content, and which things
+        // we've already seen. If we haven't seen perception yet, then we've probably got a trait. For
+        // example. Here are the heuristics we use:
+        //
+        // - The first line is a name, then creature level
+        // - All the lines between the creature level and the perception are traits
+        // - Languages and skills can be
+        line = line.trim();
         let remove = null;
         for( var i = 0; i < matchers.length; i++) {
             match = matchers[i].re.exec(line);
             if( match ) {
                 matchers[i].func(match);
                 remove = i;
+                matched[mathers[i].name] = true;
                 break;
             }
         }
@@ -1036,12 +1192,12 @@ function get_and_parse_character(msg) {
                 if( json ) {
                     parse_json_character(character, JSON.parse(json));
                     format = 'JSON'
-
                 }
                 else {
+                    log('monkey1');
                     data = load_pdf_data(notes);
                     if( data ) {
-                        parse_character(character, data);
+                        parse_json_character(character, data);
                         format = 'PDF';
                     }
                     else {
@@ -1053,7 +1209,7 @@ function get_and_parse_character(msg) {
                 sendChat(module_name, `/w gm Character ${name} parsed successfully using ${format} format`)
             }
             catch(err) {
-                log('got error + ' + err);
+                log('got error ' + err);
                 sendChat(module_name, '/w gm Error while parsing character' + String(err));
             }
 
@@ -1252,7 +1408,8 @@ function add_forceful(damage) {
     }
     damage_dice = parseInt(damage_dice[1]);
 
-    new_damage += `[[?{Attack|1st,0|2nd,1|3rd+,2}*${damage_dice}]][Forceful]`;
+    //TODO: I'd like to be able to mark this as "[Forceful]" so it's possible to inspect it in the roll20 chat, but doing so messes up the macro somehow
+    new_damage += `[[?{Attack|1st,0|2nd,1|3rd+,2}*${damage_dice}]]`;
     return new_damage;
 }
 
@@ -1269,8 +1426,8 @@ function add_sweep(attack) {
     if(false == new_attack.endsWith('+')) {
         new_attack += '+';
     }
-
-    new_attack += `?{First Target Attacked?|Yes,0|No,1}[Sweep]`;
+    //TODO: I'd like to be able to mark this as "[Sweep]" so it's possible to inspect it in the roll20 chat, but doing so messes up the macro somehow
+    new_attack += `?{First Target Attacked?|Yes,0|No,1}`;
     return new_attack;
 }
 
@@ -1366,7 +1523,8 @@ function add_attacks(id, roll_type, roll_num, attack_type, message) {
                 }
                 let pen_2 = -map;
                 let pen_3 = -2*map;
-                new_bonus += `[[?{Attack|1st,0|2nd ${pen_2},1|3rd+ ${pen_3},2}*(-${map})]][MAP]`
+                //TODO: I'd like to be able to mark this as "[MAP]" so it's possible to inspect it in the roll20 chat, but doing so messes up the macro somehow
+                new_bonus += `[[?{Attack|1st,0|2nd ${pen_2},1|3rd+ ${pen_3},2}*(-${map})]]`
                 bonus.set('current',new_bonus);
             }
         }
