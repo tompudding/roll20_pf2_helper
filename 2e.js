@@ -808,7 +808,10 @@ function parse_json_character(character, data) {
                      'society'      : 'society_notes',
                      'stealth'      : 'stealth_notes',
                      'survival'     : 'survival_notes',
-                     'thievery'     : 'thievery_notes'}
+                     'thievery'     : 'thievery_notes',
+                     'ac'           : 'armor_class_notes',
+                     'hp'           : 'hit_points_notes',
+                    }
 
     var spells      = false;
     var cantrips    = false;
@@ -820,6 +823,9 @@ function parse_json_character(character, data) {
     }
     for( var key of Object.keys(set_int) ) {
         set_attribute(character.id, set_int[key], '');
+    }
+    for( var key of Object.keys(set_notes) ) {
+        set_attribute(character.id, set_notes[key], '');
     }
 
     //Let's delete all the strikes
@@ -996,7 +1002,7 @@ function parse_json_character(character, data) {
             // monster.pf2.tools uses "lore" and "lorealt", and we extend that with "lore2", "lore3",...
             if( key != 'lore' && key != 'lorealt' ) {
                 //Check for one of our extra lores
-                let n = parseInt(lore.slice(4));
+                let n = parseInt(key.slice(4));
                 if( isNaN(n) ) {
                     continue;
                 }
@@ -1010,6 +1016,19 @@ function parse_json_character(character, data) {
                 set_attribute(character.id, stub + `${id}_` + 'lore_notes', data[key]['note']);
             }
         }
+        else if( key == 'savenote' ) {
+            // Roll20 has only one save notes field, even though we can have notes on specific
+            // saves, so we'd best collect them up here
+            let notes = data[key];
+            let saves = ['fortitude','reflex','will'];
+            let saves_short = ['Fort','Ref','Will'];
+            for( var i = 0; i < saves.length; i++ ) {
+                if( data[saves[i]] && data[saves[i]]['note'] ) {
+                    notes += `; ${saves_short[i]}: ${data[saves[i]]['note']}`;
+                }
+            }
+            set_attribute(character.id, 'saving_throws_notes', notes);
+        }
     }
 
     //Turn on spellcaster stuff if there was any
@@ -1022,6 +1041,7 @@ function parse_json_character(character, data) {
         enable_spellcaster(character.id, spells, cantrips, focusspells, innate);
         set_attribute(character.id, 'sort_normalspells', 'level');
     }
+    set_attribute(character.id, 'npc_type','Creature');
 }
 
 // The GM notes fields seems to sometimes have some html fields at the start. Let's clean it up by removing
@@ -1074,6 +1094,8 @@ function load_pdf_data(input) {
     var valid_skills = ['acrobatics', 'arcana', 'athletics', 'crafting', 'deception', 'diplomacy', 'intimidation',
                         'lore', 'medicine', 'nature', 'occultism', 'performance', 'religion', 'society', 'stealth',
                         'survival', 'thievery'];
+    var valid_sizes = ['tiny','small','medium','large','huge','gargantuan']
+    var lore_index = 0;
 
 
     matchers = [
@@ -1124,6 +1146,23 @@ function load_pdf_data(input) {
                   if( valid_skills.indexOf(skill_name) == -1 ) {
                       //This could be a lore skill
                       log('Unknown skill: ' + skill_name);
+                      if( /lore$/ig.exec(skill_name) ) {
+                          lore_index += 1;
+                          let lore_name = 'lore';
+                          if( lore_index == 1 ) {
+                              lore_name = 'lore';
+                          }
+                          else if( lore_index == 2 ) {
+                              lore_name = 'lorealt';
+                          }
+                          else {
+                              lore_name = `lore${lore_index}`;
+                          }
+                          output[lore_name] = {value : skill_value, name : skill_name};
+                          if( data[3] ) {
+                              output[lore_name].note = data[3].slice(1,-1);
+                          }
+                      }
                       continue;
                   }
                   output[skill_name] = {value : skill_value};
@@ -1157,18 +1196,88 @@ function load_pdf_data(input) {
           name : 'attributes',
         },
         { re : RegExp('^Items\\s*(.*)'),
-          func : (match) => {log('items')},
+          func : (match) => {
+              log('Got Items');
+              output.items = match[1].trim();
+          },
           name : 'items',
         },
         //For the saves line we're expecting something of the form AC [number]; Fort +/-[number] (possible
         //note for the save), Ref +/[number] (possible note for the save)
-        { re : RegExp('^AC\\s*(\\d+);\\s*Fort\\s*[+-]?(\\d+)\\s*(\\((.*?)\\))?,\\s*Ref\\s*[+-]?(\\d+)\\s*(\\((.*?)\\))?,\\s*Will\\s*[+-]?(\\d+)\\s*(\\((.*?)\\))?;?\\s*\\s*(.*)',"i"),
-          func : (match) => {log('Saves');},
+        { re : RegExp('^(AC\\s*\\d.*;.*)$', 'i'),
+          func : (match) => {
+              log('Saves');
+              let data = /AC\s(\d+)\s*(\(.*\))?;\s*Fort\s*[+-]?(\d+)\s*(\(.*?\))?,\s*Ref\s*[+-]?(\d+)\s*(\(.*?\))?,\s*Will\s*[+-]?(\d+)\s*(\(.*?\))?;?\s*\s*(.*)/i.exec(match[0]);
+              if( null == data ) {
+                  log('no match');
+                  log(match[0]);
+                  return;
+              }
+              // data breakdown:
+              // [1] == AC
+              // [2] == AC notes
+              // [3] == Fort
+              // [4] == Fort notes
+              // [5] == Reflex
+              // [6] == Reflex notes
+              // [7] == Will
+              // [8] == Will notes
+              // [9] == general save notes
+              var targets = ['ac', 'fortitude', 'reflex', 'will']
+              for( var i = 0; i < targets.length; i++) {
+                  let note_value = '';
+                  if( data[i*2+2] ) {
+                      note_value = data[i*2+2].slice(1,-1).trim();
+                  }
+                  output[targets[i]] = {value : data[i*2+1].trim(), note : note_value};
+              }
+              if( data[9] ) {
+                  output.savenote = data[9].trim();
+                  if( output.savenote[0] == ',' || output.savenote[0] == ';' ) {
+                      output.savenote = output.savenote.slice(1).trim();
+                  }
+              }
+          },
           name : 'saves',
         },
         // The HP line can have weaknesses, resistances and immunities, but I suspect some monsters will get printed at some point with those things in a different order, so we'll put it out in more than one regexp
         { re : RegExp('^HP\\s*(\\d+).*','i'),
-          func : (match) => {log('HP and defences');},
+          func : (match) => {
+              log('HP and defences');
+              log(match);
+              let data = /HP\s(\d+)\s*(,\s*(.*?);)?(.*)$/i.exec(match[0]);
+              if( null == data ) {
+                  log('no match');
+                  return;
+              }
+              log(data);
+              output.hp = {value : match[1]};
+              if( data[3] ) {
+                  output.hp.note = data[3].trim();
+              }
+
+              //That took care of HP, now let's look at immunities, weaknesses and resistances
+              var fields = ['immunities','weaknesses','resistances']
+              var targets = ['immunity','weakness','resistance'];
+
+              //We take everything up to the semicolon, which might potentially catch other fields if they omit it.
+              for(var i = 0; i < fields.length; i++) {
+                  let re = RegExp(`${fields[i]}([^;]*)`,'ig');
+                  let field_data = re.exec(data[4]);
+                  if( null == field_data || !field_data[1] ) {
+                      continue;
+                  }
+                  // As a safety check, we'll stop at any instance of the other field words
+                  let putative_value = field_data[1].trim();
+                  for( var j = 0; j < fields.length; j++) {
+                      let index = putative_value.toLowerCase().indexOf(fields[j]);
+                      if( index != -1 ) {
+                          putative_value = putative_value.slice(0, index);
+                      }
+                  }
+                  output[targets[i]] = {value : putative_value.trim()};
+              }
+          },
           name : 'hp',
         },
         // The speeds also needn't be in order
@@ -1191,8 +1300,12 @@ function load_pdf_data(input) {
                   return;
               }
               //If this is an alignment trait lets set that too
-              if( trait == 'N' || (trait.length == 2 && 'LNC'.indexOf(trait[0]) != -1 && 'GNE'.indexOf(trait[1]) != -1 )) {
+              if( trait == 'N' ||
+                  (trait.length == 2 && 'LNC'.indexOf(trait[0]) != -1 && 'GNE'.indexOf(trait[1]) != -1 )) {
                   output.alignment = trait;
+              }
+              if( valid_sizes.indexOf(trait.toLowerCase()) != -1 ) {
+                  output.size = trait.trim();
               }
               if( !output.traits ) {
                   output.traits = [match[0].trim()];
