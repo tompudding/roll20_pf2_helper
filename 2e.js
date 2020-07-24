@@ -833,6 +833,7 @@ function parse_json_character(character, data) {
     delete_repeating(character.id, 'repeating_ranged-strikes');
     delete_repeating(character.id, 'repeating_free-actions-reactions');
     delete_repeating(character.id, 'repeating_actions-activities');
+    delete_repeating(character.id, 'repeating_interaction-abilities');
     delete_repeating(character.id, 'repeating_normalspells');
     delete_repeating(character.id, 'repeating_spellinnate');
     delete_repeating(character.id, 'repeating_spellfocus');
@@ -899,9 +900,22 @@ function parse_json_character(character, data) {
                 let id = generate_row_id();
                 let stub = '';
                 let action = special['actions'];
+                if( special['type'] == 'general' ) {
+                    stub = `repeating_interaction-abilities_${id}_`;
+                }
+                else if( special['type'] == 'defense' ) {
+                    stub = `repeating_free-actions-reactions_${id}_`
+                }
+                else if( special['type'] == 'offense' ) {
+                    stub = `repeating_actions-activities_${id}_`
+                }
+                else {
+                    log("Unknown ability type: " + special['type']);
+                    continue;
+                }
+
                 if( action == 'none' || action == 'reaction' || action == 'free' ) {
                     //This should go in the automatic or reactive abilities sections
-                    stub = `repeating_free-actions-reactions_${id}_`
                     let free_action = 0;
                     let reaction = 0;
                     if( action == 'reaction' ) {
@@ -918,7 +932,6 @@ function parse_json_character(character, data) {
                         action == 'three' ||
                         action == '1 minute' ||
                         action == '10 minutes') {
-                    stub = `repeating_actions-activities_${id}_`
                     set_attribute(character.id, stub + 'actions', action);
                 }
                 else {
@@ -1073,6 +1086,76 @@ function is_title_case(words) {
     return true;
 }
 
+function new_ability(description, ability_type) {
+    log('Parsing ability: ' + description);
+    log('type: ' + ability_type);
+    let output = {type : ability_type};
+    let traits = '';
+    let action = 'none';
+    let action_names = {'[one-action]' : 'one',
+                        '[two-actions]': 'two',
+                        '[three-actions]' : 'three',
+                        '[reaction]' : 'reaction',
+                        '[free-action]' : 'free'};
+
+    //To get the name we go until the first non-caps word. That might fail if the start of the sentance after
+    //the name is in title case
+
+    words = description.split(' ');
+    for(var i = 0; i < words.length; i++) {
+        if( false == is_upper_case(words[i][0]) ) {
+            break;
+        }
+    }
+    let title_end = i;
+    let trait_start = i;
+    let description_start = i;
+
+    if( i >= 1 && i < words.length ) {
+        if( words[i][0] == '[' ) {
+            //This is probably the action type
+            if( words[i] in action_names ) {
+                action = action_names[words[i]];
+                title_end = i;
+                trait_start = i+1;
+                description_start = i+1;
+            }
+        }
+
+        if( words[trait_start][0] == '(') {
+            //blah
+        }
+        else if( action == 'none' ) {
+            title_end = i - 1;
+            trait_start = null;
+        }
+    }
+
+    description = words.slice(description_start).join(' ');
+    if( trait_start != null ) {
+        //We've got some traits
+        let re = /^.*?\((.*?)\)/g;
+        let match = re.exec(description);
+        log('traits match');
+        log(match);
+        log(re.lastIndex);
+        if( match && match[1] ) {
+            traits = match[1];
+            description = description.slice(re.lastIndex).trim();
+        }
+    }
+
+    let name = words.slice(0, title_end).join(' ');
+
+    // For traits if the first thing after the name are brackets, then those are the traits
+
+    output.name = name;
+    output.traits = traits;
+    output.actions = action;
+    output.description = description;
+
+    return output;
+}
 
 function load_pdf_data(input) {
     input = input.replace(/&nbsp;/g,' ')
@@ -1089,7 +1172,7 @@ function load_pdf_data(input) {
     }
     //try removing non-printable with magic from stack overflow
     name = name.replace(/[^ -~]+/g, "");
-    output = {name : name};
+    output = {name : name, specials : []};
     var matched = {};
     var valid_skills = ['acrobatics', 'arcana', 'athletics', 'crafting', 'deception', 'diplomacy', 'intimidation',
                         'lore', 'medicine', 'nature', 'occultism', 'performance', 'religion', 'society', 'stealth',
@@ -1104,6 +1187,7 @@ function load_pdf_data(input) {
               log('creature feature');
               output.level = parseInt(match[1]);
               output.traits = match[2].split(/[ ,]+/).join(", ");
+              return true;
           },
           name : 'level',
         },
@@ -1117,6 +1201,7 @@ function load_pdf_data(input) {
               output.perception = {value : parseInt(match[1]),
                                    note  : senses
                                   }
+              return true;
           },
           name : 'perception',
         },
@@ -1124,6 +1209,7 @@ function load_pdf_data(input) {
           func : (match) => {
               log('Got languages');
               output.languages = match[1].trim();
+              return true;
           },
           name : 'languages',
         },
@@ -1172,6 +1258,7 @@ function load_pdf_data(input) {
                   }
                   //TODO: We could also work out the benchmark here if we felt so inclined
               }
+              return true;
           },
           name : 'skills',
         },
@@ -1192,6 +1279,7 @@ function load_pdf_data(input) {
               output.intelligence = {value : data[4].replace(/ /g,'')};
               output.wisdom       = {value : data[5].replace(/ /g,'')};
               output.charisma     = {value : data[6].replace(/ /g,'')};
+              return true;
           },
           name : 'attributes',
         },
@@ -1199,6 +1287,7 @@ function load_pdf_data(input) {
           func : (match) => {
               log('Got Items');
               output.items = match[1].trim();
+              return true;
           },
           name : 'items',
         },
@@ -1237,6 +1326,7 @@ function load_pdf_data(input) {
                       output.savenote = output.savenote.slice(1).trim();
                   }
               }
+              return true;
           },
           name : 'saves',
         },
@@ -1277,19 +1367,20 @@ function load_pdf_data(input) {
                   }
                   output[targets[i]] = {value : putative_value.trim()};
               }
+              return true;
           },
           name : 'hp',
         },
         // The speeds also needn't be in order
         { re : RegExp('^Speed\\s*((\\d+) feet)?.*','i'),
-          func : (match) => {log('speeds');},
+          func : (match) => {log('speeds');return true;},
           name : 'speeds',
         },
     ];
     multi_matchers = [
         //Next we're into looking at abilities. We can find simple attacks as they start with "Melee" or "Ranged"
         { re : RegExp('^Melee\\s*.*','i'),
-          func : (match) => {log('melee');},
+          func : (match) => {log('melee');return true;},
           name : 'melee',
         },
         // After creature we can get traits which are all caps
@@ -1313,12 +1404,12 @@ function load_pdf_data(input) {
               else {
                   output.traits.push(match[0].trim());
               }
-              log('done trait');
+              return true;
           },
           name : 'trait',
         },
         { re : RegExp('^Ranged\\s*.*','i'),
-          func : (match) => {log('ranged');},
+          func : (match) => {log('ranged');return true;},
           name : 'ranged',
         },
         //Via some PDF magic it seems that we get action symbols translated into cool "[one-action]" type text which we can use. It doesn't help us if it's a passive ability, but it helps with a lot of things
@@ -1370,13 +1461,19 @@ function load_pdf_data(input) {
 
         if( null == match ) {
             // It didn't match anything, but there's still a chance it might be starting a block. I think the
-            // only way to tell here is to look at if the first two words are in title case. TODO: that
+            // only way to tell here is to look at if the first two words are in title case.
             let words = line.split(' ');
             var possible_ability = words.length > 2;
             if( possible_ability ) {
                 if( words[0] == 'Critical' && (words[1] =='Success' || words[1] == 'Failure') ) {
                     possible_ability = false;
                 }
+            }
+            if( possible_ability && words[0] == 'Maximum' && words[1] == 'Duration' ) {
+                possible_ability = false;
+            }
+            if( possible_ability && words[0] == 'Saving' && words[1] == 'Throw' ) {
+                possible_ability = false;
             }
 
             if( possible_ability && (words[0] == 'Success' || words[0] == 'Failure' )) {
@@ -1415,11 +1512,12 @@ function load_pdf_data(input) {
         // - Languages and skills can be
         line = line.trim();
         let remove = null;
+        let handled = false;
         for( var i = 0; i < matchers.length; i++) {
             match = matchers[i].re.exec(line);
             if( match ) {
                 log('match on ' + matchers[i].name);
-                log(matchers[i].func(match));
+                handled = matchers[i].func(match);
                 remove = i;
                 matched[matchers[i].name] = true;
                 break;
@@ -1428,18 +1526,36 @@ function load_pdf_data(input) {
         if( remove != null ) {
             matchers.splice(remove, 1);
         }
+        if( handled ) {
+            continue;
+        }
         for( var i = 0; i < multi_matchers.length; i++) {
             match = multi_matchers[i].re.exec(line);
             if( match ) {
                 log('match on ' + multi_matchers[i].name);
-                log(multi_matchers[i].func(match));
+                handled = multi_matchers[i].func(match);
                 matched[multi_matchers[i].name] = true;
+                break;
             }
         }
-        //if( matchers.length == 0 ) {
-        //    log('all removed');
-        //    break;
-        //}
+        if( handled ) {
+            continue;
+        }
+
+        // If we get here we haven't matched anything else which makes this a generic named ability. If we
+        // haven't had the saves yet it's an interactive ability, if we haven't had the speeds yet it's an
+        // automatic or reactive ability, and if we have it's an offensive ability
+
+        log('Unhandled line:');
+        log(line);
+        let ability_type = 'general';
+        if( 'speeds' in matched ) {
+            ability_type = 'offense';
+        }
+        else if( 'saves' in matched ) {
+            ability_type = 'defense';
+        }
+        output.specials.push(new_ability(line, ability_type));
     }
     output.traits = output.traits.join(", ");
     log(output);
