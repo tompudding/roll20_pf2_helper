@@ -1086,6 +1086,32 @@ function is_title_case(words) {
     return true;
 }
 
+function embolden(input) {
+    // In an ability some words should be bolded, and roll20 supports markdown syntax for that, so let's give it a go
+    input = input.replace(/Critical Success/g,'**Critical Success**');
+    input = input.replace(/Maximum Duration/g,'**Maximum Duration**');
+    input = input.replace(/Saving Throw/g,'**Saving Throw**');
+    input = input.replace(/Trigger/g,'**Trigger**');
+    input = input.replace(/Effect/g,'**Effect**');
+    input = input.replace(/Stage 1/g,'**Stage 1**');
+    input = input.replace(/Stage 2/g,'**Stage 2**');
+    input = input.replace(/Stage 3/g,'**Stage 3**');
+
+    let data = parse_expressions(input);
+    if( data && data.dice.length > 0 ) {
+        let output = [];
+        for( var i = 0; i < data.parts.length; i++ ) {
+            output.push(data.parts[i]);
+            if( data.dice.indexOf(i) != -1 ) {
+                output.push(`([[${data.parts[i].trim()}]]) `);
+            }
+        }
+        input = output.join('');
+    }
+
+    return input
+}
+
 function new_ability(description, ability_type) {
     log('Parsing ability: ' + description);
     log('type: ' + ability_type);
@@ -1152,7 +1178,7 @@ function new_ability(description, ability_type) {
     output.name = name;
     output.traits = traits;
     output.actions = action;
-    output.description = description;
+    output.description = embolden(description);
 
     return output;
 }
