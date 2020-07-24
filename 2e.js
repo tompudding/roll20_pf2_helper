@@ -64,6 +64,8 @@ function clean_carrots(input) {
 }
 
 function title_case(text) {
+    log('title case');
+    log(text);
     return text.replace(
         /(\w)(\w*)/g,
         (_, firstChar, rest) => firstChar.toUpperCase() + rest.toLowerCase()
@@ -748,6 +750,8 @@ function parse_json_character(character, data) {
                       'alignment' : 'alignment',
                       'size'      : 'size',
                       'type'      : 'npc_type',
+                      'languages' : 'languages',
+                      'alignment' : 'alignment',
                      };
 
     let set_int = {'level'       : 'level',
@@ -787,7 +791,24 @@ function parse_json_character(character, data) {
                      'thievery'     : 'thievery',
                      'spellattack'  : 'spell_attack',
                      'spelldc'      : 'spell_dc',
-                    }
+                    };
+
+    let set_notes = {'acrobatics'   : 'acrobatics_notes',
+                     'arcana'       : 'arcana_notes',
+                     'athletics'    : 'athletics_notes',
+                     'crafting'     : 'crafting_notes',
+                     'deception'    : 'deception_notes',
+                     'diplomacy'    : 'diplomacy_notes',
+                     'intimidation' : 'intimidation_notes',
+                     'medicine'     : 'medicine_notes',
+                     'nature'       : 'nature_notes',
+                     'occultism'    : 'occultism_notes',
+                     'performance'  : 'performance_notes',
+                     'religion'     : 'religion_notes',
+                     'society'      : 'society_notes',
+                     'stealth'      : 'stealth_notes',
+                     'survival'     : 'survival_notes',
+                     'thievery'     : 'thievery_notes'}
 
     var spells      = false;
     var cantrips    = false;
@@ -810,6 +831,7 @@ function parse_json_character(character, data) {
     delete_repeating(character.id, 'repeating_spellinnate');
     delete_repeating(character.id, 'repeating_spellfocus');
     delete_repeating(character.id, 'repeating_cantrip');
+    delete_repeating(character.id, 'repeating_lore');
     disable_spellcaster(character.id);
 
     for( var key of Object.keys(data) ) {
@@ -831,8 +853,12 @@ function parse_json_character(character, data) {
         else if( key in set_int ) {
             set_attribute(character.id, set_int[key], data[key]);
         }
-        else if( key in set_value && data[key]['value'] != "") {
+        else if( key in set_value && data[key]['value'] ) {
             set_attribute(character.id, set_value[key], data[key]['value']);
+        }
+
+        if( key in set_notes && data[key]['note'] ) {
+            set_attribute(character.id, set_notes[key], data[key]['note']);
         }
 
         else if( key == 'strikes' ) {
@@ -966,6 +992,24 @@ function parse_json_character(character, data) {
                 }
             }
         }
+        else if( key.startsWith('lore') ) {
+            // monster.pf2.tools uses "lore" and "lorealt", and we extend that with "lore2", "lore3",...
+            if( key != 'lore' && key != 'lorealt' ) {
+                //Check for one of our extra lores
+                let n = parseInt(lore.slice(4));
+                if( isNaN(n) ) {
+                    continue;
+                }
+            }
+            //Otherwise it's good and we need a new lore
+            let id = generate_row_id();
+            let stub = 'repeating_lore_';
+            set_attribute(character.id, stub + `${id}_` + 'lore_name', data[key]['name']);
+            set_attribute(character.id, stub + `${id}_` + 'lore', data[key]['value']);
+            if( data[key]['note'] ) {
+                set_attribute(character.id, stub + `${id}_` + 'lore_notes', data[key]['note']);
+            }
+        }
     }
 
     //Turn on spellcaster stuff if there was any
@@ -1013,6 +1057,8 @@ function is_title_case(words) {
 function load_pdf_data(input) {
     input = input.replace(/&nbsp;/g,' ')
     input = input.replace(/(<p[^>]+?>|<p>|<div>|<\/div>)/ig, "");
+    //Paizo sometimes uses weird symbols for minus
+    input = input.replace(/–/g,'-');
     lines = input.split(/<\/p>|<br>/ig);
 
     //The name should be the first line
@@ -1021,7 +1067,14 @@ function load_pdf_data(input) {
     if( bracket_index ) {
         name = lines[0].substring(0, bracket_index.index);
     }
+    //try removing non-printable with magic from stack overflow
+    name = name.replace(/[^ -~]+/g, "");
     output = {name : name};
+    var matched = {};
+    var valid_skills = ['acrobatics', 'arcana', 'athletics', 'crafting', 'deception', 'diplomacy', 'intimidation',
+                        'lore', 'medicine', 'nature', 'occultism', 'performance', 'religion', 'society', 'stealth',
+                        'survival', 'thievery'];
+
 
     matchers = [
         { re   : RegExp('^.*CREATURE\\s+(\\d+)\\s*(.*)','ig'),
@@ -1032,16 +1085,8 @@ function load_pdf_data(input) {
           },
           name : 'level',
         },
-        // After creature we can get traits which are all caps
-        { re   : RegExp('^\\s*[A-Z\\s]*$',''),
-          func : (match) => {
-              log('trait');
-              //output.level = parseInt(match[1]);
-              //output.traits = match[2].split(/[ ,]+/).join(", ");
-          },
-          name : 'trait',
-        },
-        { re   : RegExp('^.*Perception\\s+\\+?(\\d+);?\\s*(.*)','ig'),
+        //Perception is usually followed by a semicolon, but the sinspawn has a comma
+        { re   : RegExp('^.*Perception\\s+\\+?(\\d+)[;,]?\\s*(.*)','ig'),
           func : (match) => {
               senses = '';
               if( match[2] ) {
@@ -1056,19 +1101,59 @@ function load_pdf_data(input) {
         { re : RegExp('^Languages\\s+(.*)'),
           func : (match) => {
               log('Got languages');
-              //TODO: Split the list
               output.languages = match[1].trim();
           },
           name : 'languages',
         },
         { re : RegExp('^Skills\\s+(.*)'),
-          func : (match) => {log('skills')},
+          func : (match) => {
+              log('skills')
+              log(match);
+              for( var skill_text of match[1].split(',') ) {
+                  log(skill_text);
+                  var data = /([a-zA-Z\s]+)\s+([+-]?\d+)\s*(\(.*\))?/.exec(skill_text);
+                  if( null == data ) {
+                      continue;
+                  }
+                  let skill_name = data[1];
+                  let skill_value = data[2];
+                  if( !skill_name || !skill_value ) {
+                      continue;
+                  }
+                  skill_name = skill_name.toLowerCase().trim();
+                  if( valid_skills.indexOf(skill_name) == -1 ) {
+                      //This could be a lore skill
+                      log('Unknown skill: ' + skill_name);
+                      continue;
+                  }
+                  output[skill_name] = {value : skill_value};
+                  if( data[3] ) {
+                      //There's a note! Take off the brackets and save it
+                      output[skill_name].note = data[3].slice(1,-1);
+                  }
+                  //TODO: We could also work out the benchmark here if we felt so inclined
+              }
+          },
           name : 'skills',
         },
         // It would be nice to parse all the attributes now, but sometimes they wrap multiple lines so we'd
         // best just do the first one
         { re : RegExp('^Str ([+-]\\d+).*'),
-          func : (match) => {log('attributes')},
+          func : (match) => {
+              // The tiefling adept has a space between its + and its number. Weird. We can allow for that though
+              var data = /^Str ([+-]?\s?\d+).*Dex ([+-]?\s?\d+).*Con ([+-]?\s?\d+).*Int ([+-]?\s?\d+).*Wis ([+-]?\s?\d+).*Cha ([+-]?\s?\d+).*/.exec(match[0]);
+              log(match);
+              log(data);
+              if( null == data ) {
+                  return;
+              }
+              output.strength     = {value : data[1].replace(/ /g,'')};
+              output.dexterity    = {value : data[2].replace(/ /g,'')};
+              output.constitution = {value : data[3].replace(/ /g,'')};
+              output.intelligence = {value : data[4].replace(/ /g,'')};
+              output.wisdom       = {value : data[5].replace(/ /g,'')};
+              output.charisma     = {value : data[6].replace(/ /g,'')};
+          },
           name : 'attributes',
         },
         { re : RegExp('^Items\\s*(.*)'),
@@ -1098,6 +1183,27 @@ function load_pdf_data(input) {
           func : (match) => {log('melee');},
           name : 'melee',
         },
+        // After creature we can get traits which are all caps
+        { re   : RegExp('^\\s*([A-Z]+\\s*)+$',''),
+          func : (match) => {
+              let trait = match[0].trim();
+              if( !trait ) {
+                  return;
+              }
+              //If this is an alignment trait lets set that too
+              if( trait == 'N' || (trait.length == 2 && 'LNC'.indexOf(trait[0]) != -1 && 'GNE'.indexOf(trait[1]) != -1 )) {
+                  output.alignment = trait;
+              }
+              if( !output.traits ) {
+                  output.traits = [match[0].trim()];
+              }
+              else {
+                  output.traits.push(match[0].trim());
+              }
+              log('done trait');
+          },
+          name : 'trait',
+        },
         { re : RegExp('^Ranged\\s*.*','i'),
           func : (match) => {log('ranged');},
           name : 'ranged',
@@ -1118,6 +1224,10 @@ function load_pdf_data(input) {
 
     let final_lines = [];
     let current_lines = [];
+
+    // The first pass will be to fold lines together so we have one line for each thing. The only difficult
+    // part to that is special abilities that don't have an action because we can't match on an initial
+    // keyword and we lose the bold in the next form. We'll try using if the first n words are capitalized and
 
     for(var line of lines.slice(1)) {
         // Sometimes when copying from a pdf we get a number on a line on its own, I'm not sure why.
@@ -1149,10 +1259,6 @@ function load_pdf_data(input) {
             // It didn't match anything, but there's still a chance it might be starting a block. I think the
             // only way to tell here is to look at if the first two words are in title case. TODO: that
             let words = line.split(' ');
-            log(words)
-            log(words.slice(0, 2))
-            log(words.length < 2);
-            log(is_title_case(words.slice(2)));
             var possible_ability = words.length > 2;
             if( possible_ability ) {
                 if( words[0] == 'Critical' && (words[1] =='Success' || words[1] == 'Failure') ) {
@@ -1171,11 +1277,9 @@ function load_pdf_data(input) {
                 possible_ability = false;
             }
             if( false == possible_ability ) {
-                log('bazoo')
                 current_lines.push(line);
                 continue;
             }
-            log('kazoo')
         }
 
         //If we get here we have a match so this is starting a block. All preceding lines should be merged onto one
@@ -1188,13 +1292,7 @@ function load_pdf_data(input) {
         final_lines.push( current_lines.join(" ") );
     }
 
-    // The first pass will be to fold lines together so we have one line for each thing. The only difficult part to that is special abilities that don't have an action because we can't match on an initial keyword and we lose the bold in the next form. We'll try using if the first n words are capitalized and
-    lines = final_lines;
-    log('beep ***');
-    log(lines);
-    return null;
-
-    for(var line of lines.slice(1)) {
+    for(var line of final_lines) {
         // We take each line on its own, and decide what to do with it based on its content, and which things
         // we've already seen. If we haven't seen perception yet, then we've probably got a trait. For
         // example. Here are the heuristics we use:
@@ -1207,20 +1305,30 @@ function load_pdf_data(input) {
         for( var i = 0; i < matchers.length; i++) {
             match = matchers[i].re.exec(line);
             if( match ) {
-                matchers[i].func(match);
+                log('match on ' + matchers[i].name);
+                log(matchers[i].func(match));
                 remove = i;
-                matched[mathers[i].name] = true;
+                matched[matchers[i].name] = true;
                 break;
             }
         }
         if( remove != null ) {
             matchers.splice(remove, 1);
         }
-        if( matchers.length == 0 ) {
-            log('all removed');
-            break;
+        for( var i = 0; i < multi_matchers.length; i++) {
+            match = multi_matchers[i].re.exec(line);
+            if( match ) {
+                log('match on ' + multi_matchers[i].name);
+                log(multi_matchers[i].func(match));
+                matched[multi_matchers[i].name] = true;
+            }
         }
+        //if( matchers.length == 0 ) {
+        //    log('all removed');
+        //    break;
+        //}
     }
+    output.traits = output.traits.join(", ");
     log(output);
     return output;
 }
@@ -1799,7 +1907,7 @@ function show_reaction_buttons(msg) {
     show_generic_ability_buttons(msg, "repeating_free-actions-reactions", "Reactions & Free-actions");
 }
 
-function show_list_buttons(msg, list_name, list) {
+function get_list_buttons(msg, list_name, list) {
     //we want to get all the attacks for the character given by id
     var id = RegExp("{{id=([^}]*)}}").exec(msg.content)[1];
     var name = getAttrByName(id, 'character_name');
@@ -1809,24 +1917,45 @@ function show_list_buttons(msg, list_name, list) {
     for(var i in list) {
         message.push(`[${list[i]}](!&#13;&#37;{selected|${list[i]}})`);
     }
+    return message;
+}
+
+function show_list_buttons(message) {
     message = message.join(" ") + '}}';
 
     sendChat('GM', message);
 }
 
+
 function show_skills_buttons(msg) {
     var skill_names = ['ACROBATICS', 'ARCANA', 'ATHLETICS', 'CRAFTING', 'DECEPTION', 'DIPLOMACY', 'INTIMIDATION',
     'MEDICINE', 'NATURE', 'OCCULTISM', 'PERFORMANCE', 'RELIGION', 'SOCIETY', 'STEALTH', 'SURVIVAL', 'THIEVERY'];
+    var id = RegExp("{{id=([^}]*)}}").exec(msg.content)[1];
+    let message = get_list_buttons(msg, 'Skills', skill_names);
 
-    return show_list_buttons(msg, 'Skills', skill_names);
+    //Also add any lores we might have
+    const [IDs, attributes] = getRepeatingSectionAttrs(id,'repeating_lore');
+    for(var i in IDs) {
+        var attrs = attributes[IDs[i]];
+        //let name  = getAttrByName(id, `${attr}_$${i}_name`);
+        let lore_name = attrs['lore_name'];
+        if(lore_name) {
+            lore_name = lore_name.get('current');
+        }
+        message.push(`[${lore_name}](!&#13;&#37;{selected|repeating_lore_${IDs[i]}_LORE})`);
+    }
+    log(message);
+    show_list_buttons(message);
 }
 
 function show_save_buttons(msg) {
-    return show_list_buttons(msg, 'Saves', ['FORT', 'REF', 'WILL']);
+    let message = get_list_buttons(msg, 'Saves', ['FORT', 'REF', 'WILL']);
+    show_list_buttons(message);
 }
 
 function show_ability_check_buttons(msg) {
-    return show_list_buttons(msg, 'Ability Checks', ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']);
+    message = get_list_buttons(msg, 'Ability Checks', ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']);
+    show_list_buttons(message);
 }
 
 on('change:campaign:turnorder', function() {
