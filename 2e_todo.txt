@@ -1,0 +1,8 @@
+List interaction abilities in the buttons
+stop getting abilities parsed as spells
+parse strikes
+parse speeds
+parse spells
+handle pc sheets
+set sheet to npc on parsing
+turn off critical rolling on parsing
