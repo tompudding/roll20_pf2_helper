@@ -3,6 +3,14 @@
          parse strikes
          parse speeds
          parse spells
+         don't announce gm secret checks
+         make secret checks prettier
+         ask for unknown name
          handle pc sheets
          set sheet to npc on parsing
          turn off critical rolling on parsing
+
+Bugs:
+-----
+Ability buttons are messed up
+Parsing DC 41 as a dice expression

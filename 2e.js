@@ -52,7 +52,7 @@ function parse_roll(to_hit, die_result, threat) {
         return '[[1d1cf<0cs>1*20]] Natural Twenty!'
     }
     else {
-        return `[[1d1cf<0cs>2*${to_hit}]]`
+        return `[[${to_hit}]]`
     }
 }
 
@@ -1201,7 +1201,10 @@ function load_pdf_data(input) {
     }
     //try removing non-printable with magic from stack overflow
     name = name.replace(/[^ -~]+/g, "");
-    output = {name : name, specials : []};
+    output = {name : name,
+              specials : [],
+              strikes : [],
+             };
     var matched = {};
     var valid_skills = ['acrobatics', 'arcana', 'athletics', 'crafting', 'deception', 'diplomacy', 'intimidation',
                         'lore', 'medicine', 'nature', 'occultism', 'performance', 'religion', 'society', 'stealth',
@@ -1359,7 +1362,8 @@ function load_pdf_data(input) {
           },
           name : 'saves',
         },
-        // The HP line can have weaknesses, resistances and immunities, but I suspect some monsters will get printed at some point with those things in a different order, so we'll put it out in more than one regexp
+        // The HP line can have weaknesses, resistances and immunities, but I suspect some monsters will get
+        // printed at some point with those things in a different order, so we'll put it out in more than one regexp
         { re : RegExp('^HP\\s*(\\d+).*','i'),
           func : (match) => {
               log('HP and defences');
@@ -1408,8 +1412,27 @@ function load_pdf_data(input) {
     ];
     multi_matchers = [
         //Next we're into looking at abilities. We can find simple attacks as they start with "Melee" or "Ranged"
-        { re : RegExp('^Melee\\s*.*','i'),
-          func : (match) => {log('melee');return true;},
+        { re : RegExp('^(Melee|Ranged)\\s*.*','i'),
+          func : (match) => {
+              // The json we're using doesn't have a way to have melee attacks take a number of actions other
+              // than one. Perhaps that will always be the case as it's a strike? Hopefully!
+              data = /(Melee|Ranged)\s+(\[.*?\])?(.*?)([+-]\d+)\s*(\(.*?\))?.*Damage\s*(.*)$/ig.exec(match[0]);
+              log(data);
+              if( null == data || !data[3] || !data[4] || !data[6] ) {
+                  return;
+              }
+              let traits = '';
+              if( data[5] ) {
+                  traits = data[5].slice(1,-1);
+              }
+              output.strikes.push({name : data[3].trim(),
+                                   attack : data[4].trim(),
+                                   traits : traits,
+                                   damage : data[6].trim(),
+                                   type : data[1]}
+                                 );
+              return true;
+          },
           name : 'melee',
         },
         // After creature we can get traits which are all caps
@@ -1436,10 +1459,6 @@ function load_pdf_data(input) {
               return true;
           },
           name : 'trait',
-        },
-        { re : RegExp('^Ranged\\s*.*','i'),
-          func : (match) => {log('ranged');return true;},
-          name : 'ranged',
         },
         //Via some PDF magic it seems that we get action symbols translated into cool "[one-action]" type text which we can use. It doesn't help us if it's a passive ability, but it helps with a lot of things
         { re : RegExp('^.*(\\[one-action\\]|\\[two-actions\\]|\\[three-actions\\]|\\[reaction\\]|\\[free-action\\]).*'),
