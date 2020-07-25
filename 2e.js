@@ -333,6 +333,9 @@ class SpellRoll extends Roll {
             to_hit = to_hit = rolls['attack'].roll.results.total;
             die_result = rolls['attack'].roll.results.rolls[0].results[0].v
         }
+        else {
+            return;
+        }
 
         self.attack = new Attack(to_hit, damage, damage_type, die_result, 0, false);
     }
@@ -1654,7 +1657,7 @@ function handle_api(msg) {
                     'ability-checks' : show_ability_check_buttons,
                     'saves'          : show_save_buttons,
                     'abilities'      : show_ability_buttons,
-                    'reactions'      : show_reaction_buttons,
+                    //'reactions'      : show_reaction_buttons,
                     'spells'         : show_spell_buttons,
                     'secret-skill'   : roll_secret_skill,
                     'secret'         : roll_secret,
@@ -2143,7 +2146,7 @@ function show_generic_ability_buttons(msg, attr, type) {
 
     var num_abilities = getRepeatingSectionCounts(id,attr);
 
-    var message = [`/w ${msg.who} &{template:rolls} {{header=${name} ${type}}} {{roll01=`]
+    var message = [`/w ${msg.who} &{template:rolls} {{header=${name} ${type}}} {{desc=`]
 
     for(var i = 0; i < num_abilities; i++) {
         let name  = getAttrByName(id, `${attr}_$${i}_name`);
@@ -2154,8 +2157,9 @@ function show_generic_ability_buttons(msg, attr, type) {
 }
 
 function show_ability_buttons(msg) {
-    show_generic_ability_buttons(msg, "repeating_actions-activities", "Abilities");
     show_generic_ability_buttons(msg, "repeating_interaction-abilities", "Interaction Abilities");
+    show_generic_ability_buttons(msg, "repeating_free-actions-reactions", "Free Actions and Reactions");
+    show_generic_ability_buttons(msg, "repeating_actions-activities", "Offensive or Proactive Abilities");
 }
 
 function show_reaction_buttons(msg) {
