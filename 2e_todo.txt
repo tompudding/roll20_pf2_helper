@@ -1,7 +1,7 @@
 **done** List interaction abilities in the buttons
 **done** stop getting abilities parsed as spells
 **done** parse strikes
-         parse speeds
+**done** parse speeds
          parse spells
          don't announce gm secret checks
          make secret checks prettier
