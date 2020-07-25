@@ -172,7 +172,7 @@ function get_rolls(content, inlinerolls) {
         }
 
         if( results.length < 3) {
-            log(`nono on ${i} ${results.length}`)
+
             continue;
         }
 
@@ -758,7 +758,6 @@ function parse_json_character(character, data) {
                      };
 
     let set_int = {'level'       : 'level',
-                   'speed'       : 'speed',
                    'focuspoints' : 'focus_points',
                   };
 
@@ -849,6 +848,29 @@ function parse_json_character(character, data) {
         if( key == 'name' ) {
             //This one isn't an attribute, it's special
             character.set('name', title_case(data[key]));
+        }
+        else if( key == 'speed' ) {
+            let match = RegExp('^\\s*(\\d+)?( feet)?(.*)','i').exec(data[key]);
+            if( match ) {
+                let speed = '0';
+                let notes = '';
+                log('SPEEED');
+                log(match);
+                if( match[1] ) {
+                    speed = match[1];
+                    if( match[2] ) {
+                        speed += match[2];
+                    }
+                }
+                if( match[3] ) {
+                    notes = match[3];
+                    if( notes[0] == ',' || notes[0] == ';' ) {
+                        notes = notes.slice(1).trim();
+                    }
+                }
+                set_attribute(character.id, 'speed', speed);
+                set_attribute(character.id, 'speed_notes', notes);
+            }
         }
         else if( key == 'perception' ) {
             //This one is a bit odd as it has a notes field that sets senses
@@ -1099,6 +1121,9 @@ function embolden(input) {
     input = input.replace(/Stage 1/g,'**Stage 1**');
     input = input.replace(/Stage 2/g,'**Stage 2**');
     input = input.replace(/Stage 3/g,'**Stage 3**');
+
+    log('exp:')
+    log(input);
 
     let data = parse_expressions(input);
     if( data && data.dice.length > 0 ) {
@@ -1405,8 +1430,12 @@ function load_pdf_data(input) {
           name : 'hp',
         },
         // The speeds also needn't be in order
-        { re : RegExp('^Speed\\s*((\\d+) feet)?.*','i'),
-          func : (match) => {log('speeds');return true;},
+        { re : RegExp('^Speed\\s*(.*)','i'),
+          func : (match) => {
+              log('speeds');
+              output.speed = match[1];
+              return true;
+          },
           name : 'speeds',
         },
     ];
@@ -2163,13 +2192,17 @@ function show_generic_ability_buttons(msg, attr, type) {
 
     //var attacks = getAttrByName(id, "repeating_npc-weapon_$1_macro-text-npc");
 
-    var num_abilities = getRepeatingSectionCounts(id,attr);
+    //var num_abilities = getRepeatingSectionCounts(id,attr);
+    const [IDs, attributes] = getRepeatingSectionAttrs(id,attr);
 
     var message = [`/w ${msg.who} &{template:rolls} {{header=${name} ${type}}} {{desc=`]
-
-    for(var i = 0; i < num_abilities; i++) {
-        let name  = getAttrByName(id, `${attr}_$${i}_name`);
-        message.push(`[${name}](!&#13;&#37;{selected|${attr}_$${i}_action-npc})`);
+    log('noop');
+    log(IDs);
+    log(attributes);
+    log('boop');
+    for(var i in IDs) {
+        let name  = getAttrByName(id, `${attr}_${IDs[i]}_name`);
+        message.push(`[${name}](!&#13;&#37;{selected|${attr}_${IDs[i]}_action-npc})`);
     }
 
     sendChat('GM', message.join(" ") + '}}');
