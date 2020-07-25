@@ -3,6 +3,7 @@
 **done** parse strikes
 **done** parse speeds
          parse spells
+         Keep the line breaks before critical success etc.
          don't announce gm secret checks
          make secret checks prettier
          ask for unknown name

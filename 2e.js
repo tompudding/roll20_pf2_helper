@@ -998,8 +998,17 @@ function parse_json_character(character, data) {
                     // If they cost focus points we put them in the focus spells section
                     stub = 'repeating_spellfocus_';
                 }
-                else if (spell_type == 'innate') {
+                else if (spell_type.toLowerCase().indexOf('innate') != -1) {
                     stub = 'repeating_spellinnate_';
+                    innate = true;
+                }
+                //What is the tradition?
+                let tradition = '';
+                for( var trad of ['arcane','occult','divine','primal'] ) {
+                    if( spell_type.toLowerCase().indexOf(trad) != -1 ) {
+                        tradition = trad;
+                        break;
+                    }
                 }
 
                 for(var i = 0; i < 11; i++) {
@@ -1015,9 +1024,7 @@ function parse_json_character(character, data) {
                             level = spell_datum['cantriplevel']
                             cantrips = true;
                         }
-                        if( spell_type == 'innate' ) {
-                            innate = true;
-                        }
+
                         else if( this_focus ) {
                             focusspells = true;
                         }
@@ -1031,6 +1038,9 @@ function parse_json_character(character, data) {
                             set_attribute(character.id, this_stub + `${id}_` + 'name', spell_name);
                             set_attribute(character.id, this_stub + `${id}_` + 'current_level', level);
                             set_attribute(character.id, this_stub + `${id}_` + 'toggles', 'display,');
+                            if( tradition ) {
+                                set_attribute(character.id, this_stub + `${id}_` + 'magic_tradition', tradition);
+                            }
                         }
                     }
                 }
@@ -1114,6 +1124,7 @@ function is_title_case(words) {
 function embolden(input) {
     // In an ability some words should be bolded, and roll20 supports markdown syntax for that, so let's give it a go
     input = input.replace(/Critical Success/g,'**Critical Success**');
+    input = input.replace(/Critical Failure/g,'**Critical Failure**');
     input = input.replace(/Maximum Duration/g,'**Maximum Duration**');
     input = input.replace(/Saving Throw/g,'**Saving Throw**');
     input = input.replace(/Trigger/g,'**Trigger**');
@@ -1121,9 +1132,6 @@ function embolden(input) {
     input = input.replace(/Stage 1/g,'**Stage 1**');
     input = input.replace(/Stage 2/g,'**Stage 2**');
     input = input.replace(/Stage 3/g,'**Stage 3**');
-
-    log('exp:')
-    log(input);
 
     let data = parse_expressions(input);
     if( data && data.dice.length > 0 ) {
@@ -1273,9 +1281,9 @@ function load_pdf_data(input) {
         { re : RegExp('^Skills\\s+(.*)'),
           func : (match) => {
               log('skills')
-              log(match);
+
               for( var skill_text of match[1].split(',') ) {
-                  log(skill_text);
+
                   var data = /([a-zA-Z\s]+)\s+([+-]?\d+)\s*(\(.*\))?/.exec(skill_text);
                   if( null == data ) {
                       continue;
@@ -1325,8 +1333,6 @@ function load_pdf_data(input) {
           func : (match) => {
               // The tiefling adept has a space between its + and its number. Weird. We can allow for that though
               var data = /^Str ([+-]?\s?\d+).*Dex ([+-]?\s?\d+).*Con ([+-]?\s?\d+).*Int ([+-]?\s?\d+).*Wis ([+-]?\s?\d+).*Cha ([+-]?\s?\d+).*/.exec(match[0]);
-              log(match);
-              log(data);
               if( null == data ) {
                   return;
               }
@@ -1392,13 +1398,12 @@ function load_pdf_data(input) {
         { re : RegExp('^HP\\s*(\\d+).*','i'),
           func : (match) => {
               log('HP and defences');
-              log(match);
               let data = /HP\s(\d+)\s*(,\s*(.*?);)?(.*)$/i.exec(match[0]);
               if( null == data ) {
                   log('no match');
                   return;
               }
-              log(data);
+
               output.hp = {value : match[1]};
               if( data[3] ) {
                   output.hp.note = data[3].trim();
@@ -1446,7 +1451,6 @@ function load_pdf_data(input) {
               // The json we're using doesn't have a way to have melee attacks take a number of actions other
               // than one. Perhaps that will always be the case as it's a strike? Hopefully!
               data = /(Melee|Ranged)\s+(\[.*?\])?(.*?)([+-]\d+)\s*(\(.*?\))?.*Damage\s*(.*)$/ig.exec(match[0]);
-              log(data);
               if( null == data || !data[3] || !data[4] || !data[6] ) {
                   return;
               }
@@ -1489,13 +1493,87 @@ function load_pdf_data(input) {
           },
           name : 'trait',
         },
-        //Via some PDF magic it seems that we get action symbols translated into cool "[one-action]" type text which we can use. It doesn't help us if it's a passive ability, but it helps with a lot of things
+        { re  : RegExp('^Rituals(.*)$',''),
+          func : (match) => {
+              log('Has rituals! Roll20 has no place for this');
+          },
+          name : 'rituals'
+        },
+        //Spells
+        { re  : RegExp('^(.*)Spells DC (\\d+)(.*attack ([+-]\\d+))?(.*)$',''),
+          func : (match) => {
+              log('Got spells');
+              log(match);
+              if( null == match || !match[1] || !match[2] ) {
+                  return;
+              }
+              let type = match[1].trim();
+              let DC = match[2];
+              let spell_data = match[5];
+              let attack = ''
+              if( match[4] ) {
+                  attack = match[4].trim();
+              }
+              if( spell_data[0] == ';' || spell_data[0] == ',' ) {
+                  spell_data = spell_data.slice(1).trim();
+              }
+
+              let numerals = ['10th', '9th', '8th', '7th', '6th', '5th', '4th', '3rd', '2nd', '1st'];
+              let spells = [];
+
+              for(var i = 0; i < numerals.length; i++) {
+                  let spell_level = '';
+                  let index = spell_data.indexOf(numerals[i])
+                  if( index != -1 ) {
+                      spell_level = spell_data.slice(index + numerals[i].length);
+                      if( spell_level.indexOf(';') != -1 ) {
+                          spell_level = spell_level.slice(0, spell_level.indexOf(';'));
+                      }
+                  }
+                  spells.push(spell_level.trim());
+              }
+              //TODO: spell attack
+              let cantrips = /Cantrips \((\d+)(st|nd|rd|th)\s*\)(.*)/g.exec(spell_data);
+              let cantrip_level = '';
+              log(cantrips);
+              if( cantrips && cantrips[1] && cantrips[3]) {
+                  spells.push(cantrips[3].trim());
+              }
+              if( cantrips && cantrips[1] ) {
+                  cantrip_level = cantrips[1].trim();
+              }
+              let target = output;
+              if( output.spells ) {
+                  target = {};
+                  if( !output.morespells ) {
+                      output.morespells = [target];
+                  }
+                  else {
+                      output.morespells.push(target);
+                  }
+              }
+              target.spells = spells;
+              target.cantriplevel = cantrip_level;
+              target.spelldc = {value : DC};
+              target.spellattack = {value : attack};
+              target.spelltype = type;
+
+              log(spells);
+              return true;
+          },
+          name : 'spells',
+        },
+        // Via some PDF magic it seems that we get action symbols translated into cool "[one-action]" type
+        // text which we can use. It doesn't help us if it's a passive ability, but it helps with a lot of
+        // things. Note that melee and ranged should already have been picked up, so this ought to get
+        // abilities
         { re : RegExp('^.*(\\[one-action\\]|\\[two-actions\\]|\\[three-actions\\]|\\[reaction\\]|\\[free-action\\]).*'),
           func : (match) => {log('action');},
           name : 'action',
         },
 
-        //Poisons and diseases don't have the action symbol (as they're usually delivered by some other mechanism), but they should have a list of traits, one of which will be poison or disease.
+        // Poisons and diseases don't have the action symbol (as they're usually delivered by some other
+        // mechanism), but they should have a list of traits, one of which will be poison or disease.
         { re : RegExp('^.*(\\([^\\)]*(poison|disease).*\\)).*'),
           func : (match) => {log('affliction');},
           name : 'affliction',
@@ -1510,7 +1588,10 @@ function load_pdf_data(input) {
     // part to that is special abilities that don't have an action because we can't match on an initial
     // keyword and we lose the bold in the next form. We'll try using if the first n words are capitalized and
 
-    for(var line of lines.slice(1)) {
+    //for(var line of lines.slice(1)) {
+    for(var line_num = 1; line_num < lines.length; line_num++) {
+        let line = lines[line_num];
+        let last_line = lines[line_num - 1];
         // Sometimes when copying from a pdf we get a number on a line on its own, I'm not sure why.
         if( /^\s*\d+\s*$/.exec(line) ) {
             continue;
@@ -1562,6 +1643,21 @@ function load_pdf_data(input) {
 
             if( possible_ability && false == is_title_case(words.slice(0, 2)) ) {
                 possible_ability = false;
+            }
+
+            if( possible_ability && last_line ) {
+                //So we've got title case, but what if we have just started a sentance?
+                //TODO: We could also rule out the creatures name here?
+                let last_index = last_line.lastIndexOf('.');
+                let last_sentence = '';
+                if( last_index != -1 ) {
+                    last_sentence = last_line.slice(last_index);
+                    words = last_sentence.split(' ');
+                    log(words);
+                    if( words.length <= 2 ) {
+                        possible_ability = false;
+                    }
+                }
             }
             if( false == possible_ability ) {
                 current_lines.push(line);
