@@ -541,17 +541,53 @@ function roll_secret_skill(msg) {
         return show_secret_lore_buttons(id, msg);
     }
 
-    // We'll do the output differently depending on if we have just one or not. For a single roll we'll do the normal macro
+    // We'll do the output differently depending on if we have just one or not. For a single roll we'll do the
+    // normal macro
     if( false == playerIsGM(msg.playerid) ) {
         sendChat(msg.who, `/me rolls a secret ${skill} check...`);
     }
     message = [`/w GM &{template:rolls} {{header=Secret ${skill}}}`];
     for( var i = 0; i < characters.length; i++) {
-        let bonus = getAttrByName(characters[i].id, skill);
+        let bonus = 0;
+        let is_lore = false;
+        let has_lore = false;
+        if( skill.toLowerCase().endsWith('lore') ) {
+            // Getting the bonus here is a little different. We need to loop through the lores of this
+            // character and see if any of the names match this one
+            is_lore = true;
+            const [IDs, attributes] = getRepeatingSectionAttrs(characters[i].id,'repeating_lore');
+
+            for(var j in IDs) {
+                let attrs = attributes[IDs[j]];
+                let lore_name = attrs['lore_name'];
+                log('peep');
+                if(lore_name) {
+                    lore_name = lore_name.get('current');
+                }
+                if(lore_name && lore_name.toLowerCase().trim() == skill.toLowerCase().trim()) {
+                    bonus = attrs['lore'];
+
+                    if( bonus ) {
+                        bonus = bonus.get('current');
+                        has_lore = true;
+                        break;
+                    }
+                }
+            }
+            if( false == has_lore ) {
+                //We should just use our intelligence bonus
+                bonus = getAttrByName(characters[i].id, 'intelligence_modifier');
+            }
+        }
+        else {
+            bonus = getAttrByName(characters[i].id, skill);
+        }
+        log('jimly');
+        log(bonus);
         let name = getAttrByName(characters[i].id, 'character_name');
         let sheet_type = getAttrByName(characters[i].id, 'sheet_type');
 
-        while(bonus.startswith != undefined && bonus.startsWith('+')) {
+        while(bonus && bonus.startsWith != undefined && bonus.startsWith('+')) {
             bonus = bonus.slice(1);
         }
         if( isNaN(bonus) ) {
@@ -573,6 +609,10 @@ function roll_secret_skill(msg) {
                 rank = 'Untrained';
             }
             message.push(`{{roll0${i+1}_info=${rank}}}`);
+        }
+        else if ( is_lore && false == has_lore ) {
+            //we'll also tell the GM if the NPC is not at least trained in the lore skill in question
+            message.push(`{{roll0${i+1}_info=Untrained}}`);
         }
     }
     sendChat('GM',message.join(' '));
@@ -1928,12 +1968,13 @@ function handle_api(msg) {
                     //'reactions'      : show_reaction_buttons,
                     'spells'         : show_spell_buttons,
                     'secret-skill'   : roll_secret_skill,
+                    'secret-skills'  : show_secret_skills_buttons,
                     'secret'         : roll_secret,
                     'parse'          : get_and_parse_character,
                    };
 
     command = command[1];
-    log('command' + command);
+    log('command: ' + command);
 
     if( command in handlers ) {
         return handlers[command](msg);
@@ -2400,6 +2441,50 @@ function show_secret_lore_buttons(id, msg) {
         let n = parseInt(i)+1;
         message.push(`{{info0${n}_name=**${lore_name}**}} {{info0${n}=[**Roll**](!secret {{id=${id}&#125;} {{bonus=${bonus}&#125;} {{name=${lore_name} Lore&#125;!&#13;/me rolls a secret ${lore_name} Lore check...)}}`);
     }
+
+    sendChat('GM', message.join(" "));
+}
+
+function show_secret_skills_buttons(msg) {
+    var skill_names = ['PERCEPTION', 'ACROBATICS', 'ARCANA', 'ATHLETICS', 'CRAFTING', 'DECEPTION', 'DIPLOMACY', 'INTIMIDATION',
+    'MEDICINE', 'NATURE', 'OCCULTISM', 'PERFORMANCE', 'RELIGION', 'SOCIETY', 'STEALTH', 'SURVIVAL', 'THIEVERY'];
+    //var id = RegExp("{{id=([^}]*)}}").exec(msg.content)[1];
+    //let message = get_list_buttons(msg, 'Skills', skill_names);
+    //var name = getAttrByName(id, 'character_name');
+
+    var message = [`/w ${msg.who} &{template:rolls} {{header=Secret Skills}} {{desc=`]
+
+    for(var skill of skill_names) {
+        message.push(`[${skill}](!secret-skill {{skill=${skill}&#125;})`);
+    }
+
+    all_lores = new Set();
+
+    //Also add any lores that any of the selected players have
+    for( var obj_id of msg.selected ) {
+        //Grab the character represented by these
+        var obj = getObj(obj_id._type, obj_id._id);
+        if( !obj ) {
+            continue;
+        }
+        var character = getObj('character', obj.get('represents'));
+        const [IDs, attributes] = getRepeatingSectionAttrs(character.id,'repeating_lore');
+        for(var i in IDs) {
+            var attrs = attributes[IDs[i]];
+            //let name  = getAttrByName(id, `${attr}_$${i}_name`);
+            let lore_name = attrs['lore_name'];
+            if(lore_name) {
+                lore_name = lore_name.get('current');
+                all_lores.add(lore_name);
+            }
+        }
+    }
+    log(all_lores);
+    for( var lore_name of all_lores ) {
+        message.push(`[${lore_name}](!secret-skill {{skill=${lore_name}&#125;})`);
+    }
+    log(message);
+    message.push('}}')
 
     sendChat('GM', message.join(" "));
 }

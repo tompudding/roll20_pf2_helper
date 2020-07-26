@@ -4,8 +4,8 @@
 **done** parse speeds
 **done** parse spells
 **done** Keep the line breaks before critical success etc.
-         don't announce gm secret checks
-         make secret checks prettier
+**done** don't announce gm secret checks
+**done** make secret checks prettier
          ask for unknown name
          handle pc sheets
          set sheet to npc on parsing
