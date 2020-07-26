@@ -1122,11 +1122,30 @@ function is_lower_case(str) {
     return str == str.toLowerCase() && str != str.toUpperCase();
 }
 
+var non_principals = ['a','an','the','in','with','by','of','on','and','or','but'];
+
 function is_title_case(words) {
+    //Title case is a bit more subtle than just all caps. We need the following:
+    // * The first word is always caps
+    // * Words are only not caps if they are not "principle". The list is long but lets just get the most common
+    if( words.length < 1 ) {
+        return false;
+    }
+
+    if( false == is_upper_case(words[0]) ) {
+        return false;
+    }
+
     for( var word of words ) {
-        if( false == is_upper_case(word[0]) || (word.length > 1 && false == is_lower_case(word.slice(1))) ) {
-            return false;
+        if( is_upper_case(word[0]) && (word.length == 1 || is_lower_case(word.slice(1))) ) {
+            continue;
         }
+
+        if( non_principles.indexOf(word) != -1 ) {
+            continue;
+        }
+
+        return false;
     }
     return true;
 }
@@ -1191,7 +1210,7 @@ function new_ability(description_data, ability_type) {
 
     words = description.split(' ');
     for(var i = 0; i < words.length; i++) {
-        if( false == is_upper_case(words[i][0]) ) {
+        if( false == is_upper_case(words[i][0]) && (non_principals.indexOf(words[i]) == -1) ) {
             break;
         }
     }
