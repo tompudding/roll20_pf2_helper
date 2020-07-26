@@ -591,7 +591,7 @@ function roll_secret_skill(msg) {
             bonus = bonus.slice(1);
         }
         if( isNaN(bonus) ) {
-            sendChat('GM', `/w GM Invalid skill bonus ${bonus} for ${name}`);
+            sendChat(module_name, `/w GM Invalid skill bonus ${bonus} for ${name}`);
             continue;
         }
         bonus = parseInt(bonus);
@@ -615,21 +615,28 @@ function roll_secret_skill(msg) {
             message.push(`{{roll0${i+1}_info=Untrained}}`);
         }
     }
-    sendChat('GM',message.join(' '));
+    sendChat(module_name,message.join(' '));
 }
 
 function roll_secret(msg) {
     var bonus_str = RegExp("{{bonus=([^}]*)}}").exec(msg.content)[1];
+    if( !bonus_str ) {
+        sendChat(module_name, `/w ${msg.who} Invalid secret macro invocation; no bonus provided`);
+        return;
+    }
     while(bonus_str.startsWith('+')) {
         bonus_str = bonus_str.slice(1);
     }
     var bonus = parseInt(bonus_str);
     if( isNaN(bonus) ) {
-        sendChat('GM', `/w GM Invalid input ${bonus_str}`);
+        sendChat(module_name, `/w ${msg.who} Invalid input ${bonus_str}`);
         return;
     }
     var who = msg.who;
-    sendChat('GM', `/w GM Secret roll for ${who} with bonus ${bonus_str} = [[1d20+${bonus}]]`);
+    if( false == playerIsGM(msg.playerid) ) {
+        sendChat(msg.who, `/me rolls a secret check with bonus ${bonus}...`);
+    }
+    sendChat(module_name, `/w GM &{template:rolls} {{header=Secret Roll}} {{subheader=For ${msg.who}}} {{roll01=[[1d20+${bonus}]]}}`);
 }
 
 function parse_expressions(damage_string) {
@@ -2012,7 +2019,7 @@ function handle_whisper(msg) {
         return;
     }
 
-    sendChat('GM', roll.format());
+    sendChat(module_name, roll.format());
 }
 
 function handle_general(msg) {
@@ -2296,7 +2303,7 @@ function show_attack_buttons(msg) {
 
     log(message.join(" "));
 
-    sendChat('GM', message.join(" ") );
+    sendChat(module_name, message.join(" ") );
 }
 
 function add_spells(id, roll_num, spell_type, spell_type_name, message) {
@@ -2405,7 +2412,7 @@ function show_spell_buttons(msg) {
 
     log(message)
 
-    sendChat('GM', message.join(" ") );
+    sendChat(module_name, message.join(" ") );
 }
 
 function show_secret_lore_buttons(id, msg) {
@@ -2442,7 +2449,7 @@ function show_secret_lore_buttons(id, msg) {
         message.push(`{{info0${n}_name=**${lore_name}**}} {{info0${n}=[**Roll**](!secret {{id=${id}&#125;} {{bonus=${bonus}&#125;} {{name=${lore_name} Lore&#125;!&#13;/me rolls a secret ${lore_name} Lore check...)}}`);
     }
 
-    sendChat('GM', message.join(" "));
+    sendChat(module_name, message.join(" "));
 }
 
 function show_secret_skills_buttons(msg) {
@@ -2486,7 +2493,7 @@ function show_secret_skills_buttons(msg) {
     log(message);
     message.push('}}')
 
-    sendChat('GM', message.join(" "));
+    sendChat(module_name, message.join(" "));
 }
 
 function show_generic_ability_buttons(msg, attr, type) {
@@ -2510,7 +2517,7 @@ function show_generic_ability_buttons(msg, attr, type) {
         message.push(`[${name}](!&#13;&#37;{selected|${attr}_${IDs[i]}_action-npc})`);
     }
 
-    sendChat('GM', message.join(" ") + '}}');
+    sendChat(module_name, message.join(" ") + '}}');
 }
 
 function show_ability_buttons(msg) {
@@ -2539,7 +2546,7 @@ function get_list_buttons(msg, list_name, list) {
 function show_list_buttons(message) {
     message = message.join(" ") + '}}';
 
-    sendChat('GM', message);
+    sendChat(module_name, message);
 }
 
 
