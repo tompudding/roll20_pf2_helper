@@ -2,8 +2,8 @@
 **done** stop getting abilities parsed as spells
 **done** parse strikes
 **done** parse speeds
-         parse spells
-         Keep the line breaks before critical success etc.
+**done** parse spells
+**done** Keep the line breaks before critical success etc.
          don't announce gm secret checks
          make secret checks prettier
          ask for unknown name
@@ -14,4 +14,7 @@
 Bugs:
 -----
 **done** Ability buttons are messed up  : (this is only partially fixed, the order is still weird)
-Parsing DC 41 as a dice expression
+         Sandpoint attack of opportunes doesn't parse
+**skip** Parsing DC 41 as a dice expression
+         First parse on a new character has the spell type toggles flipped
+         We sometimes have core rulebook references left in the spell name

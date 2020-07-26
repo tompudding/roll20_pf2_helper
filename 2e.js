@@ -844,7 +844,7 @@ function parse_json_character(character, data) {
     disable_spellcaster(character.id);
 
     for( var key of Object.keys(data) ) {
-
+        log(key);
         if( key == 'name' ) {
             //This one isn't an attribute, it's special
             character.set('name', title_case(data[key]));
@@ -979,19 +979,27 @@ function parse_json_character(character, data) {
             //We've got some spells. Firsty we need to turn on the spellcaster options.
             if( key == 'spells' ) {
                 var spell_data = [data];
-                var spell_type = data['spelltype'];
+                var spell_type_key = 'spelltype';
             }
             else {
                 var spell_data = data['morespells'];
-                var spell_type = spell_data['name'];
+                var spell_type_key = 'name';
                 // The input can have a different DC and attack roll here, but the roll20 sheet doesn't
                 // support it so we ignore it
             }
-            if( spell_type ) {
-                spell_type = spell_type.toLowerCase();
-            }
+
             for( var spell_datum of spell_data ) {
+                let spell_type = spell_datum[spell_type_key];
+                if( spell_type ) {
+                    spell_type = spell_type.toLowerCase();
+                }
+
                 var this_focus = spell_datum['focuspoints'] != undefined && spell_datum['focuspoints'] != '';
+
+                if( this_focus ) {
+                    //We need to set the number of focus points too
+                    set_attribute(character.id, 'focus_points', parseInt(spell_datum['focuspoints']));
+                }
 
                 var stub = `repeating_normalspells_`;
                 if( this_focus ) {
@@ -1004,10 +1012,12 @@ function parse_json_character(character, data) {
                 }
                 //What is the tradition?
                 let tradition = '';
-                for( var trad of ['arcane','occult','divine','primal'] ) {
-                    if( spell_type.toLowerCase().indexOf(trad) != -1 ) {
-                        tradition = trad;
-                        break;
+                if( spell_type ) {
+                    for( var trad of ['arcane','occult','divine','primal'] ) {
+                        if( spell_type.indexOf(trad) != -1 ) {
+                            tradition = trad;
+                            break;
+                        }
                     }
                 }
 
@@ -1121,10 +1131,24 @@ function is_title_case(words) {
     return true;
 }
 
-function embolden(input) {
+function format_ability_description(input, breaks) {
     // In an ability some words should be bolded, and roll20 supports markdown syntax for that, so let's give it a go
-    input = input.replace(/Critical Success/g,'**Critical Success**');
-    input = input.replace(/Critical Failure/g,'**Critical Failure**');
+    log('formatting string: ' + input);
+    log(breaks);
+    //Now just to insert newlines into the string at those points...
+    let broken_string = [];
+    let pos = 0;
+    for( var break_pos of breaks ) {
+        broken_string.push(input.slice(pos, break_pos));
+        pos = break_pos;
+    }
+    broken_string.push(input.slice(pos));
+    input = broken_string.join('\n');
+
+    input = input.replace(/\nCritical Success /g,'\n**Critical Success** ');
+    input = input.replace(/\nSuccess /g,'\n**Success** ');
+    input = input.replace(/\nCritical Failure /g,'\n**Critical Failure** ');
+    input = input.replace(/\nFailure /g,'\n**Failure** ');
     input = input.replace(/Maximum Duration/g,'**Maximum Duration**');
     input = input.replace(/Saving Throw/g,'**Saving Throw**');
     input = input.replace(/Trigger/g,'**Trigger**');
@@ -1148,7 +1172,8 @@ function embolden(input) {
     return input
 }
 
-function new_ability(description, ability_type) {
+function new_ability(description_data, ability_type) {
+    let description = description_data.line;
     log('Parsing ability: ' + description);
     log('type: ' + ability_type);
     let output = {type : ability_type};
@@ -1162,6 +1187,7 @@ function new_ability(description, ability_type) {
 
     //To get the name we go until the first non-caps word. That might fail if the start of the sentance after
     //the name is in title case
+
 
     words = description.split(' ');
     for(var i = 0; i < words.length; i++) {
@@ -1194,17 +1220,30 @@ function new_ability(description, ability_type) {
     }
 
     description = words.slice(description_start).join(' ');
+    let offset = 0;
+    for(var i = 0; i < description_start; i++) {
+        offset += words[i].length + 1;
+    }
+
     if( trait_start != null ) {
         //We've got some traits
         let re = /^.*?\((.*?)\)/g;
         let match = re.exec(description);
-        log('traits match');
-        log(match);
-        log(re.lastIndex);
+
         if( match && match[1] ) {
             traits = match[1];
-            description = description.slice(re.lastIndex).trim();
+            description = description.slice(re.lastIndex);
+            offset += re.lastIndex;
+
+            //Now we're going to trim it, but we'd best update our offsets if we take anything off the front
+            let old_len = description.length;
+            description = description.replace(/^\s+/,"");
+            offset += old_len - description.length;
         }
+    }
+
+    for(var i = 0; i < description_data.breaks.length; i++) {
+        description_data.breaks[i] -= offset;
     }
 
     let name = words.slice(0, title_end).join(' ');
@@ -1214,8 +1253,34 @@ function new_ability(description, ability_type) {
     output.name = name;
     output.traits = traits;
     output.actions = action;
-    output.description = embolden(description);
+    output.description = format_ability_description(description, description_data.breaks);
 
+    return output;
+}
+
+function join_ability_lines(lines) {
+    // We're basically doing a "lines.join(' ')", but we also want to include a list of positions that need
+    // line-breaks reinserting, because of the "critical success: " type blocks that shouldn't be collected
+    // all onto one line
+    let output = {line : '', breaks : []};
+    if( lines.length < 1 ) {
+        return output;
+    }
+    let final_lines = []
+
+    //First strip whitespace from the start of the first line so we don't mess up our offsets
+    lines[0] = lines[0].replace(/^\s+/,"");
+    let pos = 0;
+    for( var line of lines ) {
+        if( line.startsWith('Critical Success ') ||
+            line.startsWith('Success ') ||
+            line.startsWith('Failure ') ||
+            line.startsWith('Critical Failure ') ) {
+            output.breaks.push(pos);
+        }
+        pos += line.length + 1;
+    }
+    output.line = lines.join(' ');
     return output;
 }
 
@@ -1234,10 +1299,10 @@ function load_pdf_data(input) {
     }
     //try removing non-printable with magic from stack overflow
     name = name.replace(/[^ -~]+/g, "");
-    output = {name : name,
-              specials : [],
-              strikes : [],
-             };
+    var output = {name : name,
+                  specials : [],
+                  strikes : [],
+                 };
     var matched = {};
     var valid_skills = ['acrobatics', 'arcana', 'athletics', 'crafting', 'deception', 'diplomacy', 'intimidation',
                         'lore', 'medicine', 'nature', 'occultism', 'performance', 'religion', 'society', 'stealth',
@@ -1521,6 +1586,15 @@ function load_pdf_data(input) {
               let numerals = ['10th', '9th', '8th', '7th', '6th', '5th', '4th', '3rd', '2nd', '1st'];
               let spells = [];
 
+              //Do we have focus points?
+              let focus_points = ''
+              let focus_re = /\((\d+) focus points?\)/ig;
+              let focus_match = focus_re.exec(spell_data);
+              if( focus_match ) {
+                  focus_points = focus_match[1];
+                  spell_data = spell_data.slice(0, focus_match.index) + spell_data.slice(focus_re.lastIndex);
+              }
+
               for(var i = 0; i < numerals.length; i++) {
                   let spell_level = '';
                   let index = spell_data.indexOf(numerals[i])
@@ -1532,7 +1606,7 @@ function load_pdf_data(input) {
                   }
                   spells.push(spell_level.trim());
               }
-              //TODO: spell attack
+
               let cantrips = /Cantrips \((\d+)(st|nd|rd|th)\s*\)(.*)/g.exec(spell_data);
               let cantrip_level = '';
               log(cantrips);
@@ -1544,7 +1618,7 @@ function load_pdf_data(input) {
               }
               let target = output;
               if( output.spells ) {
-                  target = {};
+                  target = {name : type};
                   if( !output.morespells ) {
                       output.morespells = [target];
                   }
@@ -1552,11 +1626,14 @@ function load_pdf_data(input) {
                       output.morespells.push(target);
                   }
               }
+              else {
+                  output.spelltype = type;
+              }
               target.spells = spells;
               target.cantriplevel = cantrip_level;
               target.spelldc = {value : DC};
               target.spellattack = {value : attack};
-              target.spelltype = type;
+              target.focuspoints = focus_points;
 
               log(spells);
               return true;
@@ -1667,15 +1744,15 @@ function load_pdf_data(input) {
 
         //If we get here we have a match so this is starting a block. All preceding lines should be merged onto one
         if( current_lines.length > 0 ) {
-            final_lines.push( current_lines.join(" ") );
+            final_lines.push( join_ability_lines(current_lines) );
         }
         current_lines = [line];
     }
     if( current_lines.length > 0 ) {
-        final_lines.push( current_lines.join(" ") );
+        final_lines.push( join_ability_lines(current_lines) );
     }
 
-    for(var line of final_lines) {
+    for(var line_data of final_lines) {
         // We take each line on its own, and decide what to do with it based on its content, and which things
         // we've already seen. If we haven't seen perception yet, then we've probably got a trait. For
         // example. Here are the heuristics we use:
@@ -1683,6 +1760,7 @@ function load_pdf_data(input) {
         // - The first line is a name, then creature level
         // - All the lines between the creature level and the perception are traits
         // - Languages and skills can be
+        let line = line_data.line;
         line = line.trim();
         let remove = null;
         let handled = false;
@@ -1728,7 +1806,7 @@ function load_pdf_data(input) {
         else if( 'saves' in matched ) {
             ability_type = 'defense';
         }
-        output.specials.push(new_ability(line, ability_type));
+        output.specials.push(new_ability(line_data, ability_type));
     }
     output.traits = output.traits.join(", ");
     log(output);
