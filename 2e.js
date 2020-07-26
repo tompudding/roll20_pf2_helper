@@ -523,32 +523,59 @@ const getRepeatingSectionAttrs = function (charid, prefix) {
 }
 
 function roll_secret_skill(msg) {
-    let matches=RegExp("{{id=([^}]*)}}.*{{skill=([^}]*)}}").exec(msg.content)
-    if( matches.length != 3 ) {
-        return;
+    log(msg.selected);
+    let characters = [];
+    for( var obj_id of msg.selected ) {
+        //Grab the character represented by these
+        var obj = getObj(obj_id._type, obj_id._id);
+        if( !obj ) {
+            continue;
+        }
+        var character = getObj('character', obj.get('represents'));
+        characters.push(character);
     }
-    let id = matches[1];
-    let skill = matches[2];
-    if( skill != "Lore") {
-        //This one is fairly easy, we just grab their current skill bonus in this skill and roll it
-        skill = skill.toUpperCase();
-        let bonus = getAttrByName(id, skill);
-        let who = msg.who;
+    let matches=RegExp("{{skill=([^}]*)}}","g").exec(msg.content)
+    let skill = matches[1];
+    let skill_upper = skill.toUpperCase();
+    if( skill == 'Lore' ) {
+        return show_secret_lore_buttons(id, msg);
+    }
+
+    // We'll do the output differently depending on if we have just one or not. For a single roll we'll do the normal macro
+    if( false == playerIsGM(msg.playerid) ) {
+        sendChat(msg.who, `/me rolls a secret ${skill} check...`);
+    }
+    message = [`/w GM &{template:rolls} {{header=Secret ${skill}}}`];
+    for( var i = 0; i < characters.length; i++) {
+        let bonus = getAttrByName(characters[i].id, skill);
+        let name = getAttrByName(characters[i].id, 'character_name');
+        let sheet_type = getAttrByName(characters[i].id, 'sheet_type');
 
         while(bonus.startswith != undefined && bonus.startsWith('+')) {
             bonus = bonus.slice(1);
         }
-        bonus = parseInt(bonus);
         if( isNaN(bonus) ) {
-            sendChat('GM', `/w GM Invalid input ${bonus_str}`);
-            return;
+            sendChat('GM', `/w GM Invalid skill bonus ${bonus} for ${name}`);
+            continue;
         }
-        sendChat('GM', `/w GM Secret roll for ${who} in ${skill} with bonus ${bonus} = [[1d20+${bonus}]]`);
+        bonus = parseInt(bonus);
+        message.push(`{{roll0${i+1}=[[1d20+${bonus}]]}} {{roll0${i+1}_name=${name}}}`);
+        if( sheet_type == 'character' ) {
+            //We can also stick the characters training with the skill on for players
+            let rank = getAttrByName(characters[i].id, `${skill_upper}_rank`);
+            var ranks = { 0 : 'Untrained' ,
+                          2 : 'Trained',
+                          4 : 'Expert',
+                          6 : 'Master',
+                          8 : 'Legendary' }
+            rank = ranks[rank];
+            if( !rank ) {
+                rank = 'Untrained';
+            }
+            message.push(`{{roll0${i+1}_info=${rank}}}`);
+        }
     }
-    else {
-        //We want to send a button to the player to press that will be populated with lores to roll secretly
-        return show_secret_lore_buttons(id, msg);
-    }
+    sendChat('GM',message.join(' '));
 }
 
 function roll_secret(msg) {
