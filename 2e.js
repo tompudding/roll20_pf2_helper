@@ -1225,9 +1225,9 @@ function is_title_case(words) {
 }
 
 function format_ability_description(input, breaks) {
-    // In an ability some words should be bolded, and roll20 supports markdown syntax for that, so let's give it a go
-    log('formatting string: ' + input);
-    log(breaks);
+    // In an ability some words should be bolded, and roll20 supports markdown syntax for that, so let's give
+    // it a go
+
     //Now just to insert newlines into the string at those points...
     let broken_string = [];
     let pos = 0;
@@ -1267,8 +1267,6 @@ function format_ability_description(input, breaks) {
 
 function new_ability(description_data, ability_type) {
     let description = description_data.line;
-    log('Parsing ability: ' + description);
-    log('type: ' + ability_type);
     let output = {type : ability_type};
     let traits = '';
     let action = 'none';
@@ -1909,12 +1907,21 @@ function load_pdf_data(input) {
 function get_and_parse_character(msg) {
     log(msg.selected);
     var id = RegExp("{{id=([^}]*)}}").exec(msg.content)[1];
+    var unknown_name = /{{unknown_name=(.*?)}}/g.exec(msg.content);
+
+    if( unknown_name && unknown_name[1] ) {
+        log(unknown_name[1]);
+        set_attribute(id, 'unknown_name', unknown_name[1]);
+    }
+    else {
+        set_attribute(id, 'unknown_name', '');
+    }
 
     var character = getObj("character", id);
     log('character =' + character);
-    //var gm_notes = getAttrByName(id, 'gmnotes');
+
     //GM notes are asynchronous
-    //set_attribute(id, 'name', 'jimbo');
+
     log(character);
     character.get(
         'gmnotes',
@@ -1928,7 +1935,6 @@ function get_and_parse_character(msg) {
                     format = 'JSON'
                 }
                 else {
-                    log('monkey1');
                     data = load_pdf_data(notes);
                     if( data ) {
                         parse_json_character(character, data);
@@ -1940,6 +1946,10 @@ function get_and_parse_character(msg) {
                     }
                 }
                 name = character.get('name');
+                let unknown_name = get_attribute(character.id, 'unknown_name');
+                if( !unknown_name ) {
+                    set_attribute(id, 'unknown_name', name);
+                }
                 sendChat(module_name, `/w gm Character ${name} parsed successfully using ${format} format`)
             }
             catch(err) {
