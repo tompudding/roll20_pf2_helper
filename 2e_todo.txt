@@ -8,13 +8,13 @@
 **done** make secret checks prettier
 **done** ask for unknown name
 **done** create macros
-         do init
-         handle pc sheets
 **done** set sheet to npc on parsing
 **done** turn off critical rolling on parsing
-         add config options
 **done** remove size and alignment from traits
 **done** spontaenous spellcasters number of slots
+**done** handle pc sheets (it's not great, but at least it doesn't rewrite their attacks)
+         add config options
+**skip** do init (I'm not sure this is worth it, we can use groupinitiative)
 
 Bugs:
 -----

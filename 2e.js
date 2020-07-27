@@ -2105,6 +2105,7 @@ function handle_api(msg) {
                     'secret-skills'  : show_secret_skills_buttons,
                     'secret'         : roll_secret,
                     'parse'          : get_and_parse_character,
+                    //'init'           : roll_init,
                    };
 
     command = command[1];
@@ -2280,8 +2281,7 @@ function add_forceful(damage) {
     }
     damage_dice = parseInt(damage_dice[1]);
 
-    //TODO: I'd like to be able to mark this as "[Forceful]" so it's possible to inspect it in the roll20 chat, but doing so messes up the macro somehow
-    new_damage += `[[?{Attack|1st,0|2nd,1|3rd+,2}*${damage_dice}]]`;
+    new_damage += `[[?{Attack|1st,0|2nd,1|3rd+,2}*${damage_dice}]][Forceful]`;
     return new_damage;
 }
 
@@ -2299,7 +2299,7 @@ function add_sweep(attack) {
         new_attack += '+';
     }
     //TODO: I'd like to be able to mark this as "[Sweep]" so it's possible to inspect it in the roll20 chat, but doing so messes up the macro somehow
-    new_attack += `?{First Target Attacked?|Yes,0|No,1}`;
+    new_attack += `?{First Target Attacked?|Yes,0|No,1}[Sweep]`;
     return new_attack;
 }
 
@@ -2323,6 +2323,7 @@ function add_attacks(id, roll_type, roll_num, attack_type, message) {
     var num_attacks = IDs.length;
     var show_bonus = true;
     var bonus_matcher = RegExp("\\+?(\\d+)");
+    let sheet_type = getAttrByName(id, 'sheet_type');
 
     //var num_attacks = all_attrs.length;
     //log(num_attacks);
@@ -2351,7 +2352,7 @@ function add_attacks(id, roll_type, roll_num, attack_type, message) {
         }
         let damage = attrs['weapon_strike_damage'];
         if(damage) {
-            if( traits.toLowerCase().includes('forceful') ) {
+            if( sheet_type == 'npc' && traits.toLowerCase().includes('forceful') ) {
                 //We want to add a bonus to damage
                 let new_damage = add_forceful(damage);
                 if( new_damage ) {
@@ -2383,7 +2384,7 @@ function add_attacks(id, roll_type, roll_num, attack_type, message) {
                 new_bonus = new_bonus.toString();
             }
             //At this point we can check if the macro has been added to the weapon strike, and update it if not!
-            if( new_bonus.indexOf('?{Attack') == -1 ) {
+            if( sheet_type == 'npc' && new_bonus.indexOf('?{Attack') == -1 ) {
                 //This means we take the bonus as correct and update the weapon strike with our macro, but we
                 //first need to check if agile is one of the traits
                 if(false == new_bonus.endsWith('+')) {
@@ -2395,12 +2396,11 @@ function add_attacks(id, roll_type, roll_num, attack_type, message) {
                 }
                 let pen_2 = -map;
                 let pen_3 = -2*map;
-                //TODO: I'd like to be able to mark this as "[MAP]" so it's possible to inspect it in the roll20 chat, but doing so messes up the macro somehow
-                new_bonus += `[[?{Attack|1st,0|2nd ${pen_2},1|3rd+ ${pen_3},2}*(-${map})]]`
+                new_bonus += `([[?{Attack|1st,0|2nd ${pen_2},1|3rd+ ${pen_3},2}*(-${map})]][MAP])`
                 bonus.set('current',new_bonus);
             }
         }
-        if( traits.toLowerCase().includes('sweep') ) {
+        if( sheet_type == 'npc' && traits.toLowerCase().includes('sweep') ) {
             let new_bonus = add_sweep(bonus);
             if( new_bonus ) {
                 bonus.set('current', new_bonus);
@@ -2417,8 +2417,12 @@ function add_attacks(id, roll_type, roll_num, attack_type, message) {
         else {
             bonus = "0";
         }
-
-        message.push(`{{${roll_type}0${roll_num}_name=[${name} +${bonus}](!&#13;&#37;{selected|repeating_${attack_type}-strikes_$${i}_ATTACK-DAMAGE-NPC})}} {{${roll_type}0${roll_num}=${damage} ${damage_type} ${traits}}}`);
+        if( sheet_type == 'npc' ) {
+            message.push(`{{${roll_type}0${roll_num}_name=[${name} +${bonus}](!&#13;&#37;{selected|repeating_${attack_type}-strikes_$${i}_ATTACK-DAMAGE-NPC})}} {{${roll_type}0${roll_num}=${damage} ${damage_type} ${traits}}}`);
+        }
+        else {
+            message.push(`{{${roll_type}0${roll_num}_name=[${name} +${bonus}](!&#13;&#37;{selected|repeating_${attack_type}-strikes_$${i}_ATTACK-DAMAGE}) [#2](!&#13;&#37;{selected|repeating_${attack_type}-strikes_$${i}_ATTACK-DAMAGE2}) [#3](!&#13;&#37;{selected|repeating_${attack_type}-strikes_$${i}_ATTACK-DAMAGE3})}} {{${roll_type}0${roll_num}=${damage} ${damage_type} ${traits}}}`);
+        }
         roll_num += 1
     }
     //message.push('}} ');
@@ -2754,19 +2758,16 @@ on("ready", function() {
         {
             name : 'abilities',
             require : '!abilities',
-            full : '!abilities {{id=@{selected|character_id}}}',
             token_action : true,
         },
         {
             name : 'ability-checks',
             require : '!ability-checks',
-            full : '!ability-checks {{id=@{selected|character_id}}}',
             token_action : true,
         },
         {
             name : 'attacks',
             require : '!attacks',
-            full : '!attacks {{id=@{selected|character_id}}}',
             token_action : true,
         },
         {
@@ -2778,7 +2779,6 @@ on("ready", function() {
         {
             name : 'saves',
             require : '!saves',
-            full : '!saves {{id=@{selected|character_id}}}',
             token_action : true,
         },
         {
@@ -2795,16 +2795,20 @@ on("ready", function() {
             token_action : true,
             all_players : true,
         },
+        // {
+        //     name : 'init',
+        //     require : '!init',
+        //     full : '!init {{skill=?{Initiative Skill?|Perception|Acrobatics|Arcana|Athletics|Crafting|Deception|Diplomacy|Intimidation|Medicine|Nature|Occultism|Performance|Religion|Society|Stealth|Survival|Thievery}',
+        //     token_action : true,
+        // },
         {
             name : 'skills',
             require : '!skills',
-            full : '!skills {{id=@{selected|character_id}}}',
             token_action : true,
         },
         {
             name : 'spells',
             require : '!spells',
-            full : '!spells {{id=@{selected|character_id}}}',
             token_action : true,
         },
     ]
@@ -2843,13 +2847,17 @@ on("ready", function() {
         }
         log('Missing macro: ' + macro.require);
         let visibleto = '';
+        let full = macro.full;
+        if( !full ) {
+            full = macro.require + '{{id=@{selected|character_id}}}';
+        }
         if( macro.all_players ) {
             visibleto = 'all';
         }
         createObj('macro', {
             name : macro.name,
             _playerid : gmid,
-            action : macro.full,
+            action : full,
             istokenaction : macro.token_action,
             visibleto : visibleto});
 
