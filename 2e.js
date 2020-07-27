@@ -1537,6 +1537,10 @@ function load_pdf_data(input) {
     input = input.replace(/(<p[^>]+?>|<p>|<div>|<\/div>)/ig, "");
     //Paizo sometimes uses weird symbols for minus
     input = input.replace(/–/g,'-');
+
+    //The GMG uses unicode instead of symbols
+    input = input.replace(/\ue904/ug,'[reaction]');
+    input = input.replace(/\ue902/ug,'[one-action]');
     lines = input.split(/<\/p>|<br>/ig);
 
     //The name should be the first line
@@ -1760,7 +1764,7 @@ function load_pdf_data(input) {
 
     multi_matchers = [
         //Next we're into looking at abilities. We can find simple attacks as they start with "Melee" or "Ranged"
-        { re : RegExp('^(Melee|Ranged)\\s*.*','i'),
+        { re : RegExp('^(Melee|Ranged)\\s*.*',''),
           func : (match) => {
               // The json we're using doesn't have a way to have melee attacks take a number of actions other
               // than one. Perhaps that will always be the case as it's a strike? Hopefully!
