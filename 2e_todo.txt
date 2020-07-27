@@ -26,7 +26,7 @@ Bugs:
          We sometimes have core rulebook references left in the spell name
          Gamemastery Guide has unicode instead of action symbols which breaks things
 **done** Dero Stalker has some spell problems
-         comma separated lists inside brackets in spells mess us up (e.g on the Balisse)
+**done** comma separated lists inside brackets in spells mess us up (e.g on the Balisse)
 
 
 problem monsters:

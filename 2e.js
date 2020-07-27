@@ -1017,6 +1017,9 @@ function parse_json_character(character, data) {
                 set_attribute(character.id, stub + 'weapon_strike_damage', damage.damage);
                 set_attribute(character.id, stub + 'weapon_strike_damage_type', damage.type);
                 set_attribute(character.id, stub + 'weapon_strike_damage_additional', damage.additional);
+                if( strike['notes'] ) {
+                    set_attribute(character.id, stub + 'weapon_notes', strike['notes']);
+                }
                 set_attribute(character.id, stub + 'toggles', 'display,');
                 reporder[prefix].push(id);
             }
@@ -1409,6 +1412,16 @@ function num_title_case(words) {
     return words.length;
 }
 
+function num_in_title(words) {
+    let n = num_title_case(words);
+
+    while(n > 0 && words[n] && is_lower_case(words[n][0]) ) {
+        n -= 1;
+    }
+
+    return n;
+}
+
 function new_ability(description_data, ability_type) {
     let description = description_data.line;
     let output = {type : ability_type};
@@ -1425,7 +1438,9 @@ function new_ability(description_data, ability_type) {
 
 
     words = description.split(' ');
-    var i = num_title_case(words);
+    var i = num_in_title(words);
+    log(words);
+    log(i);
 
     let title_end = i;
     let trait_start = i;
@@ -1446,8 +1461,8 @@ function new_ability(description_data, ability_type) {
             //blah
         }
         else if( action == 'none' ) {
-            title_end = i - 1;
-            description_start = i - 1;
+            //title_end = i - 1;
+            //description_start = i - 1;
             trait_start = null;
         }
     }
@@ -1749,18 +1764,31 @@ function load_pdf_data(input) {
           func : (match) => {
               // The json we're using doesn't have a way to have melee attacks take a number of actions other
               // than one. Perhaps that will always be the case as it's a strike? Hopefully!
+              let notes = '';
+              let damage = '0';
               data = /(Melee|Ranged)\s+(\[.*?\])?(.*?)([+-]\d+)\s*(\(.*?\))?.*Damage\s*(.*)$/ig.exec(match[0]);
               if( null == data || !data[3] || !data[4] || !data[6] ) {
-                  return;
+                  //Bloodseekers and maybe others don't have damage listed, just an effect...
+                  data = /(Melee|Ranged)\s+(\[.*?\])?(.*?)([+-]\d+)\s*(\(.*?\))?.*(Effect\s*.*)$/ig.exec(match[0]);
+                  if( null == data || !data[3] || !data[4] || !data[6] ) {
+                      return;
+                  }
+                  damage = '0';
+                  notes = data[6].trim();
+              }
+              else {
+                  damage = data[6].trim();
               }
               let traits = '';
               if( data[5] ) {
                   traits = data[5].slice(1,-1);
               }
+              log(data);
               output.strikes.push({name : data[3].trim(),
                                    attack : data[4].trim(),
                                    traits : traits,
-                                   damage : data[6].trim(),
+                                   damage : damage,
+                                   notes : notes,
                                    type : data[1]}
                                  );
               return true;
@@ -1970,20 +1998,20 @@ function load_pdf_data(input) {
                 possible_ability = false;
             }
             //We get the number in title case, because there should be a title followed by the first word of a sentence. That last word better not be lower case though otherwise it can't start a sentence
-            let num_in_title_case = num_title_case(words);
-            let num_in_title = num_in_title_case - 1;
-            if( possible_ability && num_in_title_case < 2 ) {
+            let num_title = num_in_title(words);
+            if( possible_ability && num_title < 1 ) {
                 possible_ability = false;
             }
 
-            if( possible_ability && (false == is_upper_case(words[num_in_title_case - 1][0])) ) {
-                possible_ability = false;
-            }
+            // if( possible_ability && (false == is_upper_case(words[num_in_title_case - 1][0])) ) {
+            //     log('badness ' + words[num_in_title_case - 1]);
+            //     possible_ability = false;
+            // }
 
             if( possible_ability ) {
                 //we can also rule out this ability if it's got any of a short list of bad words in it
                 let bad_words = ['GM'];
-                let test_words = words.slice(0, num_in_title + 1);
+                let test_words = words.slice(0, num_title + 1);
                 for( bad_word of bad_words ) {
                     if( test_words.indexOf(bad_word) != -1 ){
                         possible_ability = false;
