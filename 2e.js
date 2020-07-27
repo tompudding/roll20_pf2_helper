@@ -1219,7 +1219,7 @@ function is_title_case(words) {
         return false;
     }
 
-    if( false == is_upper_case(words[0]) ) {
+    if( false == is_upper_case(words[0][0]) ) {
         return false;
     }
 
@@ -1228,10 +1228,9 @@ function is_title_case(words) {
             continue;
         }
 
-        if( non_principles.indexOf(word) != -1 ) {
+        if( non_principals.indexOf(word) != -1 ) {
             continue;
         }
-
         return false;
     }
     return true;
@@ -1699,6 +1698,17 @@ function load_pdf_data(input) {
                   spell_data = spell_data.slice(0, focus_match.index) + spell_data.slice(focus_re.lastIndex);
               }
 
+              //We look for cantrips first because we don't want to accidentally pick them up as spells if the creature doesn't have spells of the same level
+              let cantrip_re = /Cantrips \((\d+)(st|nd|rd|th)\s*\)(.*)/g
+              let cantrips = cantrip_re.exec(spell_data);
+              let cantrip_level = '';
+              log(cantrips);
+              if( cantrips && cantrips[1] ) {
+                  cantrip_level = cantrips[1].trim();
+              }
+              if( cantrips ) {
+                  spell_data = spell_data.slice(0, cantrips.index);
+              }
               for(var i = 0; i < numerals.length; i++) {
                   let spell_level = '';
                   let index = spell_data.indexOf(numerals[i])
@@ -1710,16 +1720,10 @@ function load_pdf_data(input) {
                   }
                   spells.push(spell_level.trim());
               }
-
-              let cantrips = /Cantrips \((\d+)(st|nd|rd|th)\s*\)(.*)/g.exec(spell_data);
-              let cantrip_level = '';
-              log(cantrips);
               if( cantrips && cantrips[1] && cantrips[3]) {
                   spells.push(cantrips[3].trim());
               }
-              if( cantrips && cantrips[1] ) {
-                  cantrip_level = cantrips[1].trim();
-              }
+
               let target = output;
               if( output.spells ) {
                   target = {name : type};
@@ -1834,7 +1838,6 @@ function load_pdf_data(input) {
                 if( last_index != -1 ) {
                     last_sentence = last_line.slice(last_index);
                     words = last_sentence.split(' ');
-                    log(words);
                     if( words.length <= 2 ) {
                         possible_ability = false;
                     }
