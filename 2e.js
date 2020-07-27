@@ -1135,7 +1135,7 @@ function parse_json_character(character, data) {
                         else if( level > 0 && !this_focus ) {
                             //If there any non-cantrip spells that don't include a number of slots, then
                             //they're a spontaneous spellcaster
-                            spontaneous = true;
+                            prepared = true;
                         }
 
                         var spell_names = spell_info.split(', ');
@@ -1339,8 +1339,6 @@ function new_ability(description_data, ability_type) {
     let title_end = i;
     let trait_start = i;
     let description_start = i;
-    log('i=' + i);
-    log(words);
 
     if( i >= 1 && i < words.length ) {
         if( words[i][0] == '[' ) {
