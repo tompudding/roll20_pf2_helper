@@ -1447,6 +1447,7 @@ function new_ability(description_data, ability_type) {
         }
         else if( action == 'none' ) {
             title_end = i - 1;
+            description_start = i - 1;
             trait_start = null;
         }
     }
@@ -1535,7 +1536,7 @@ function load_pdf_data(input) {
                   specials : [],
                   strikes : [],
                  };
-    var matched = {};
+
     var valid_skills = ['acrobatics', 'arcana', 'athletics', 'crafting', 'deception', 'diplomacy', 'intimidation',
                         'lore', 'medicine', 'nature', 'occultism', 'performance', 'religion', 'society', 'stealth',
                         'survival', 'thievery'];
@@ -1544,7 +1545,7 @@ function load_pdf_data(input) {
 
 
     matchers = [
-        { re   : RegExp('^.*CREATURE\\s+(\\d+)\\s*(.*)','ig'),
+        { re   : RegExp('^.*CREATURE\\s+([+-]?\\d+)\\s*(.*)','ig'),
           func : (match) => {
               log('creature feature');
               output.level = parseInt(match[1]);
@@ -1656,7 +1657,7 @@ function load_pdf_data(input) {
         { re : RegExp('^(AC\\s*\\d.*[;,].*)$', 'i'),
           func : (match) => {
               log('Saves');
-              let data = /AC\s(\d+)\s*(\(.*\))?[;,]\s*Fort\s*[+-]?(\d+)\s*(\(.*?\))?,\s*Ref\s*[+-]?(\d+)\s*(\(.*?\))?,\s*Will\s*[+-]?(\d+)\s*(\(.*?\))?;?\s*\s*(.*)/i.exec(match[0]);
+              let data = /AC\s(\d+)\s*(\(.*\).*?)?[;,]\s*Fort\s*[+-]?(\d+)\s*(\(.*?\))?,\s*Ref\s*[+-]?(\d+)\s*(\(.*?\))?,\s*Will\s*[+-]?(\d+)\s*(\(.*?\))?;?\s*\s*(.*)/i.exec(match[0]);
               if( null == data ) {
                   log('no match');
                   log(match[0]);
@@ -1676,7 +1677,7 @@ function load_pdf_data(input) {
               for( var i = 0; i < targets.length; i++) {
                   let note_value = '';
                   if( data[i*2+2] ) {
-                      note_value = data[i*2+2].slice(1,-1).trim();
+                      note_value = data[i*2+2].trim();
                   }
                   output[targets[i]] = {value : data[i*2+1].trim(), note : note_value};
               }
@@ -1741,6 +1742,7 @@ function load_pdf_data(input) {
           name : 'speeds',
         },
     ];
+
     multi_matchers = [
         //Next we're into looking at abilities. We can find simple attacks as they start with "Melee" or "Ranged"
         { re : RegExp('^(Melee|Ranged)\\s*.*','i'),
@@ -1903,7 +1905,7 @@ function load_pdf_data(input) {
           name : 'affliction',
         },
     ]
-    matches = {};
+    var matched = {};
 
     let final_lines = [];
     let current_lines = [];
@@ -1927,9 +1929,12 @@ function load_pdf_data(input) {
         let match = null;
         // Next we check to see if it matches any of our special matchers
         for( var i = 0; i < matchers.length; i++) {
-            match = matchers[i].re.exec(line);
-            if( match ) {
-                break;
+            if( !matched[matchers[i].name] ) {
+                match = matchers[i].re.exec(line);
+                if( match ) {
+                    matched[matchers[i].name] = true;
+                    break;
+                }
             }
         }
         if( null == match ) {
@@ -2012,6 +2017,11 @@ function load_pdf_data(input) {
                 current_lines.push(line);
                 continue;
             }
+            // else {
+            //     log("PA: " + line);
+            //     log(words);
+            //     log('---');
+            // }
         }
 
         //If we get here we have a match so this is starting a block. All preceding lines should be merged onto one
@@ -2023,6 +2033,7 @@ function load_pdf_data(input) {
     if( current_lines.length > 0 ) {
         final_lines.push( join_ability_lines(current_lines) );
     }
+    matched = {};
 
     for(var line_data of final_lines) {
         // We take each line on its own, and decide what to do with it based on its content, and which things
@@ -2037,8 +2048,9 @@ function load_pdf_data(input) {
         let remove = null;
         let handled = false;
         for( var i = 0; i < matchers.length; i++) {
+            matchers[i].re.lastIndex = 0;
             match = matchers[i].re.exec(line);
-            if( match ) {
+            if( match != null ) {
                 log('match on ' + matchers[i].name);
                 handled = matchers[i].func(match);
                 remove = i;
@@ -2053,6 +2065,7 @@ function load_pdf_data(input) {
             continue;
         }
         for( var i = 0; i < multi_matchers.length; i++) {
+            multi_matchers[i].re.lastIndex = 0;
             match = multi_matchers[i].re.exec(line);
             if( match ) {
                 log('match on ' + multi_matchers[i].name);

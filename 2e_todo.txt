@@ -27,3 +27,7 @@ Bugs:
          Gamemastery Guide has unicode instead of action symbols which breaks things
 **done** Dero Stalker has some spell problems
          comma separated lists inside brackets in spells mess us up (e.g on the Balisse)
+
+
+problem monsters:
+GIANT ANIMATED STATUE (we split up the ability description at "Burn Alive")
