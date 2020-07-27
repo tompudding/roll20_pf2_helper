@@ -917,6 +917,7 @@ function parse_json_character(character, data) {
     delete_repeating(character.id, 'repeating_lore');
     delete_repeating(character.id, 'repeating_items-worn');
     disable_spellcaster(character.id);
+    set_attribute(character.id, 'sheet_type', 'npc');
 
     for( var key of Object.keys(data) ) {
         log(key);
@@ -1185,6 +1186,7 @@ function parse_json_character(character, data) {
         set_attribute(character.id, 'sort_normalspells', 'level');
     }
     set_attribute(character.id, 'npc_type','Creature');
+    set_attribute(character.id, 'sheet_type', 'npc');
 }
 
 // The GM notes fields seems to sometimes have some html fields at the start. Let's clean it up by removing
@@ -1984,7 +1986,7 @@ function handle_api(msg) {
     //log(msg.content);
     //log(msg.inlinerolls);
     //log(msg.selected);
-    let command = msg.content.match('!([^\\s]+)\\s');
+    let command = msg.content.match('!([^\\s]+)');
     if( null == command || command.length < 2 ) {
         return;
     }
@@ -2629,5 +2631,116 @@ on('change:campaign:initiativepage', function() {
     }
     catch(err) {
         log(err);
+    }
+});
+
+on("ready", function() {
+    // On page creation we're going to make sure the table has all the macros we know will be wanted. This
+    // might annoy GMs if they've deleted a macro they don't want and we keep creating it, so we should allow
+    // this to be turned off somehow
+    macros = findObjs({type : 'macro'});
+    required_macros = [
+        {
+            name : 'abilities',
+            require : '!abilities',
+            full : '!abilities {{id=@{selected|character_id}}}',
+            token_action : true,
+        },
+        {
+            name : 'ability-checks',
+            require : '!ability-checks',
+            full : '!ability-checks {{id=@{selected|character_id}}}',
+            token_action : true,
+        },
+        {
+            name : 'attacks',
+            require : '!attacks',
+            full : '!attacks {{id=@{selected|character_id}}}',
+            token_action : true,
+        },
+        {
+            name : 'parse',
+            require : '!parse',
+            full : '!parse {{id=@{selected|character_id}}} {{unknown_name=?{What name should the players see? Set to empty string to use actual name|Scary Monster}}}',
+            token_action : false,
+        },
+        {
+            name : 'saves',
+            require : '!saves',
+            full : '!saves {{id=@{selected|character_id}}}',
+            token_action : true,
+        },
+        {
+            name : 'secret',
+            require : '!secret',
+            full : '!secret {{bonus=?{Enter your skill bonus:|0}}}',
+            token_action : true,
+            all_players : true,
+        },
+        {
+            name : 'secret-skills',
+            require : '!secret-skills',
+            full : '!secret-skills',
+            token_action : true,
+            all_players : true,
+        },
+        {
+            name : 'skills',
+            require : '!skills',
+            full : '!skills {{id=@{selected|character_id}}}',
+            token_action : true,
+        },
+        {
+            name : 'spells',
+            require : '!spells',
+            full : '!spells {{id=@{selected|character_id}}}',
+            token_action : true,
+        },
+    ]
+
+    let have_macros = new Set();
+
+    for( var macro of macros ) {
+        let name = macro.get('name');
+        let action = macro.get('action');
+        let match = /^(![^\s]+)/.exec(action);
+        if( !match || !match[1] ) {
+            continue;
+        }
+
+        log('Have existing macro: ' + match[1]);
+        have_macros.add(match[1]);
+    }
+
+    //To create a macro we need the GM playerid
+    playerids = findObjs({type : 'player'});
+    let gmid = null;
+    for( var player of playerids ) {
+        if( playerIsGM(player.id) ){
+            gmid = player.id;
+            break;
+        }
+    }
+    if( null == gmid ) {
+        log('Error getting GMid');
+        return;
+    }
+
+    for( var macro of required_macros ) {
+        if( have_macros.has(macro.require) ) {
+            continue;
+        }
+        log('Missing macro: ' + macro.require);
+        let visibleto = '';
+        if( macro.all_players ) {
+            visibleto = 'all';
+        }
+        createObj('macro', {
+            name : macro.name,
+            _playerid : gmid,
+            action : macro.full,
+            istokenaction : macro.token_action,
+            visibleto : visibleto});
+
     }
 });

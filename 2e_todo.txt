@@ -7,9 +7,10 @@
 **done** don't announce gm secret checks
 **done** make secret checks prettier
 **done** ask for unknown name
-         create macros
+**done** create macros
+         do init
          handle pc sheets
-         set sheet to npc on parsing
+**done** set sheet to npc on parsing
          turn off critical rolling on parsing
          add config options
 
@@ -20,3 +21,5 @@ Bugs:
 **skip** Parsing DC 41 as a dice expression
          First parse on a new character has the spell type toggles flipped
          We sometimes have core rulebook references left in the spell name
+         Gamemastery Guide has unicode instead of action symbols which breaks things
+         Dero Stalker has some spell problems
