@@ -2011,7 +2011,9 @@ function load_pdf_data(input) {
             if( possible_ability ) {
                 //we can also rule out this ability if it's got any of a short list of bad words in it
                 let bad_words = ['GM'];
-                let test_words = words.slice(0, num_title + 1);
+                let bad_titles = ['damage','stage'];
+                let test_words = words.slice(0, num_title);
+                let putative_title = test_words.join(" ").trim();
                 for( bad_word of bad_words ) {
                     if( test_words.indexOf(bad_word) != -1 ){
                         possible_ability = false;
@@ -2019,7 +2021,11 @@ function load_pdf_data(input) {
                     }
                 }
                 //similarly if there are any full stops we can reject it
-                if(test_words.join(' ').indexOf('.') != -1) {
+                if(putative_title.indexOf('.') != -1) {
+                    possible_ability = false;
+                }
+                //abilities are unlikely to be called "damage", and we've probably just not connected it to the previous melee
+                else if(bad_titles.indexOf(putative_title.toLowerCase()) != -1) {
                     possible_ability = false;
                 }
             }
