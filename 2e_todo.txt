@@ -7,9 +7,11 @@
 **done** don't announce gm secret checks
 **done** make secret checks prettier
 **done** ask for unknown name
+         create macros
          handle pc sheets
          set sheet to npc on parsing
          turn off critical rolling on parsing
+         add config options
 
 Bugs:
 -----
