@@ -11,7 +11,7 @@
          do init
          handle pc sheets
 **done** set sheet to npc on parsing
-         turn off critical rolling on parsing
+**done** turn off critical rolling on parsing
          add config options
 **done** remove size and alignment from traits
 **done** spontaenous spellcasters number of slots
@@ -22,6 +22,7 @@ Bugs:
 **done** Sandpoint attack of opportunes doesn't parse
 **skip** Parsing DC 41 as a dice expression
 **done** First parse on a new character has the spell type toggles flipped
+         2nd and subsequent parses can mess up attack order
          We sometimes have core rulebook references left in the spell name
          Gamemastery Guide has unicode instead of action symbols which breaks things
 **done** Dero Stalker has some spell problems

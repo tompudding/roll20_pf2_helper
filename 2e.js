@@ -922,6 +922,9 @@ function parse_json_character(character, data) {
     set_attribute(character.id, 'sheet_type', 'npc');
     set_attribute(character.id, 'spellcaster_prepared', '0');
     set_attribute(character.id, 'spellcaster_spontaneous', '0');
+    set_attribute(character.id, 'roll_option_critical_damage','none');
+    set_attribute(character.id, 'whispertype','/w gm ');
+    set_attribute(character.id, 'roll_show_notes','[[1]]');
 
     for( var key of Object.keys(data) ) {
         log(key);
