@@ -2093,8 +2093,8 @@ var toggle_buttons = {'innate' : ['toggle_innate','innate'],
 function disable_spellcaster(id) {
     var toggles = get_attribute(id, 'toggles');
     if( toggles == undefined || toggles == null ) {
-        set_attribute(id, 'toggles', '');
-        return;
+        toggles = '';
+        set_attribute(id, 'toggles', toggles);
     }
     log(`Initial toggles "${toggles}"`);
 

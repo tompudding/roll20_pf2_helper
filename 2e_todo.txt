@@ -14,13 +14,14 @@
          turn off critical rolling on parsing
          add config options
          remove size and alignment from traits
+         spontaenous spellcasters number of slots
 
 Bugs:
 -----
 **done** Ability buttons are messed up  : (this is only partially fixed, the order is still weird)
 **done** Sandpoint attack of opportunes doesn't parse
 **skip** Parsing DC 41 as a dice expression
-         First parse on a new character has the spell type toggles flipped
+**done** First parse on a new character has the spell type toggles flipped
          We sometimes have core rulebook references left in the spell name
          Gamemastery Guide has unicode instead of action symbols which breaks things
 **done** Dero Stalker has some spell problems
