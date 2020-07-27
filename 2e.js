@@ -915,6 +915,7 @@ function parse_json_character(character, data) {
     delete_repeating(character.id, 'repeating_spellfocus');
     delete_repeating(character.id, 'repeating_cantrip');
     delete_repeating(character.id, 'repeating_lore');
+    delete_repeating(character.id, 'repeating_items-worn');
     disable_spellcaster(character.id);
 
     for( var key of Object.keys(data) ) {
@@ -1160,6 +1161,16 @@ function parse_json_character(character, data) {
                 }
             }
             set_attribute(character.id, 'saving_throws_notes', notes);
+        }
+        else if( key == 'items' ) {
+            for( var item of data[key].split(',') ) {
+                let item_name = item.trim();
+                let id = generate_row_id();
+                let stub = 'repeating_items-worn_';
+                set_attribute(character.id, stub + `${id}_` + 'worn_item', item_name);
+                set_attribute(character.id, stub + `${id}_` + 'description', '');
+                set_attribute(character.id, stub + `${id}_` + 'toggles', 'display,');
+            }
         }
     }
 
