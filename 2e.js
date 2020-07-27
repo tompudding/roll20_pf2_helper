@@ -492,22 +492,31 @@ const getRepeatingSectionAttrs = function (charid, prefix) {
     const repeatingAttrs = {};
     const regExp = new RegExp(`^${prefix}_(-[-A-Za-z0-9]+?|\\d+)_(.*)`);
     //const type_regexp = new RegExp('^${prefix}_(-[-A-Za-z0-9]+?|\\d+)_(.*)`);
-	let repOrder;
-	// Get attributes
-	findObjs({
-		_type: 'attribute',
-		_characterid: charid
-	}).forEach(o => {
-		const attrName = o.get('name');
-		if (attrName.search(regExp) === 0) repeatingAttrs[attrName] = o;
-		else if (attrName === `_reporder_${prefix}`) repOrder = o.get('current').split(',');
-	});
-	if (!repOrder) repOrder = [];
-	// Get list of repeating row ids by prefix from repeatingAttrs
-	const unorderedIds = [...new Set(Object.keys(repeatingAttrs)
-		.map(n => n.match(regExp))
-		.filter(x => !!x)
-		.map(a => a[1]))];
+    let repOrder;
+
+    // Get attributes
+    findObjs({
+	_type: 'attribute',
+	_characterid: charid
+    }).forEach(o => {
+	const attrName = o.get('name');
+	if (attrName.search(regExp) === 0) {
+            repeatingAttrs[attrName] = o;
+        }
+	else if (attrName === `_reporder_${prefix}`) {
+            repOrder = o.get('current').split(',');
+        }
+    });
+
+    if (!repOrder) {
+        repOrder = [];
+    }
+    // Get list of repeating row ids by prefix from repeatingAttrs
+    const unorderedIds = [...new Set(Object.keys(repeatingAttrs)
+		                     .map(n => n.match(regExp))
+		                     .filter(x => !!x)
+		                     .map(a => a[1]))];
+
     const repRowIds = [...new Set(repOrder.filter(x => unorderedIds.includes(x)).concat(unorderedIds))];
     const wtf_functional_madness = {}
     for(var o in repeatingAttrs) {
@@ -895,6 +904,9 @@ function parse_json_character(character, data) {
     var innate      = false;
     var prepared    = false;
     var spontaneous = false;
+    let spell_reporder = {};
+    let lore_reporder = [];
+    let item_reporder = [];
 
     for( var key of Object.keys(set_value) ) {
         set_attribute(character.id, set_value[key], '');
@@ -977,22 +989,28 @@ function parse_json_character(character, data) {
         }
 
         else if( key == 'strikes' ) {
+            let reporder = {'repeating_melee-strikes'  : [],
+                            'repeating_ranged-strikes' : [],
+                           };
             for( var strike of data[key] ) {
                 let id = generate_row_id();
-                let stub = '';
+                let prefix = '';
+
                 if( strike['type'] == 'Melee' ) {
-                    stub = `repeating_melee-strikes_${id}_`;
+                    prefix = 'repeating_melee-strikes';
                 }
                 else if( strike['type'] == 'Ranged' ) {
-                    stub = `repeating_ranged-strikes_${id}_`;
+                    prefix = 'repeating_ranged-strikes';
                 }
                 else {
                     continue;
                 }
+                let stub = `${prefix}_${id}_`
                 let damage = parse_damage(strike['damage']);
                 if( null == damage ) {
                     continue;
                 }
+
                 set_attribute(character.id, stub + 'weapon', strike['name']);
                 set_attribute(character.id, stub + 'weapon_strike', strike['attack']);
                 set_attribute(character.id, stub + 'weapon_traits', strike['traits']);
@@ -1000,27 +1018,37 @@ function parse_json_character(character, data) {
                 set_attribute(character.id, stub + 'weapon_strike_damage_type', damage.type);
                 set_attribute(character.id, stub + 'weapon_strike_damage_additional', damage.additional);
                 set_attribute(character.id, stub + 'toggles', 'display,');
+                reporder[prefix].push(id);
+            }
+            for( var key of Object.keys(reporder) ) {
+                set_attribute(character.id, '_reporder_' + key, reporder[key].join(','));
             }
         }
 
         else if( key == 'specials' ) {
+            let reporder = {'repeating_interaction-abilities'  : [],
+                            'repeating_free-actions-reactions' : [],
+                            'repeating_actions-activities' : [],
+                           };
             for(var special of data[key]) {
                 let id = generate_row_id();
-                let stub = '';
+
                 let action = special['actions'];
+                let prefix = '';
                 if( special['type'] == 'general' ) {
-                    stub = `repeating_interaction-abilities_${id}_`;
+                    prefix = 'repeating_interaction-abilities';
                 }
                 else if( special['type'] == 'defense' ) {
-                    stub = `repeating_free-actions-reactions_${id}_`
+                    prefix = 'repeating_free-actions-reactions'
                 }
                 else if( special['type'] == 'offense' ) {
-                    stub = `repeating_actions-activities_${id}_`
+                    prefix = 'repeating_actions-activities'
                 }
                 else {
                     log("Unknown ability type: " + special['type']);
                     continue;
                 }
+                let stub = `${prefix}_${id}_`;
 
                 if( action == 'none' || action == 'reaction' || action == 'free' ) {
                     //This should go in the automatic or reactive abilities sections
@@ -1056,6 +1084,10 @@ function parse_json_character(character, data) {
                 set_attribute(character.id, stub + 'rep_traits', special['traits']);
                 set_attribute(character.id, stub + 'description', description);
                 set_attribute(character.id, stub + 'toggles', 'display,');
+                reporder[prefix].push(id);
+            }
+            for( var key of Object.keys(reporder) ) {
+                set_attribute(character.id, '_reporder_' + key, reporder[key].join(','));
             }
         }
         else if( key == 'spells' || key == 'morespells' ) {
@@ -1084,13 +1116,13 @@ function parse_json_character(character, data) {
                     set_attribute(character.id, 'focus_points', parseInt(spell_datum['focuspoints']));
                 }
 
-                var stub = `repeating_normalspells_`;
+                var stub = `repeating_normalspells`;
                 if( this_focus ) {
                     // If they cost focus points we put them in the focus spells section
-                    stub = 'repeating_spellfocus_';
+                    stub = 'repeating_spellfocus';
                 }
                 else if (spell_type.toLowerCase().indexOf('innate') != -1) {
-                    stub = 'repeating_spellinnate_';
+                    stub = 'repeating_spellinnate';
                     innate = true;
                 }
                 //What is the tradition?
@@ -1113,7 +1145,7 @@ function parse_json_character(character, data) {
                         let this_stub = stub;
                         if( level == 0 ) {
                             //cantrips
-                            this_stub = `repeating_cantrip_`;
+                            this_stub = `repeating_cantrip`;
                             level = spell_datum['cantriplevel']
                             //oddly the cantrip level field is called "cantrips_per_day"
                             set_attribute(character.id, 'cantrips_per_day', level);
@@ -1147,12 +1179,16 @@ function parse_json_character(character, data) {
                                 continue;
                             }
                             let id = generate_row_id();
-                            set_attribute(character.id, this_stub + `${id}_` + 'name', spell_name);
-                            set_attribute(character.id, this_stub + `${id}_` + 'current_level', level);
-                            set_attribute(character.id, this_stub + `${id}_` + 'toggles', 'display,');
+                            set_attribute(character.id, this_stub + `_${id}_` + 'name', spell_name);
+                            set_attribute(character.id, this_stub + `_${id}_` + 'current_level', level);
+                            set_attribute(character.id, this_stub + `_${id}_` + 'toggles', 'display,');
                             if( tradition ) {
-                                set_attribute(character.id, this_stub + `${id}_` + 'magic_tradition', tradition);
+                                set_attribute(character.id, this_stub + `_${id}_` + 'magic_tradition', tradition);
                             }
+                            if( spell_reporder[stub] == undefined ) {
+                                spell_reporder[stub] = [];
+                            }
+                            spell_reporder[stub].push(id);
                         }
                     }
                 }
@@ -1169,12 +1205,13 @@ function parse_json_character(character, data) {
             }
             //Otherwise it's good and we need a new lore
             let id = generate_row_id();
-            let stub = 'repeating_lore_';
-            set_attribute(character.id, stub + `${id}_` + 'lore_name', data[key]['name']);
-            set_attribute(character.id, stub + `${id}_` + 'lore', data[key]['value']);
+            let stub = 'repeating_lore';
+            set_attribute(character.id, stub + `_${id}_` + 'lore_name', data[key]['name']);
+            set_attribute(character.id, stub + `_${id}_` + 'lore', data[key]['value']);
             if( data[key]['note'] ) {
-                set_attribute(character.id, stub + `${id}_` + 'lore_notes', data[key]['note']);
+                set_attribute(character.id, stub + `_${id}_` + 'lore_notes', data[key]['note']);
             }
+            lore_reporder.push(id);
         }
         else if( key == 'savenote' ) {
             // Roll20 has only one save notes field, even though we can have notes on specific
@@ -1193,10 +1230,11 @@ function parse_json_character(character, data) {
             for( var item of data[key].split(',') ) {
                 let item_name = item.trim();
                 let id = generate_row_id();
-                let stub = 'repeating_items-worn_';
-                set_attribute(character.id, stub + `${id}_` + 'worn_item', item_name);
-                set_attribute(character.id, stub + `${id}_` + 'description', '');
-                set_attribute(character.id, stub + `${id}_` + 'toggles', 'display,');
+                let stub = 'repeating_items-worn';
+                set_attribute(character.id, stub + `_${id}_` + 'worn_item', item_name);
+                set_attribute(character.id, stub + `_${id}_` + 'description', '');
+                set_attribute(character.id, stub + `_${id}_` + 'toggles', 'display,');
+                item_reporder.push(id);
             }
         }
     }
@@ -1217,6 +1255,11 @@ function parse_json_character(character, data) {
             set_attribute(character.id, 'spellcaster_spontaneous', 'spontaneous');
         }
     }
+    for( var key of Object.keys(spell_reporder) ) {
+        set_attribute(character.id, '_reporder_' + key, spell_reporder[key].join(','));
+    }
+    set_attribute(character.id, '_reporder_repeating_lore', lore_reporder.join(','));
+    set_attribute(character.id, '_reporder_repeating_items-worn', item_reporder.join(','));
     set_attribute(character.id, 'npc_type','Creature');
     set_attribute(character.id, 'sheet_type', 'npc');
 }
@@ -1868,8 +1911,20 @@ function load_pdf_data(input) {
                 // critical in them
                 possible_ability = false;
             }
-            if( possible_ability && num_title_case(words) < 2 ) {
+            let num_in_title = num_title_case(words) - 1;
+            if( possible_ability && num_in_title < 1 ) {
                 possible_ability = false;
+            }
+            if( possible_ability ) {
+                //we can also rule out this ability if it's got any of a short list of bad words in it
+                let bad_words = ['GM'];
+                let test_words = words.slice(0, num_in_title + 1);
+                for( bad_word of bad_words ) {
+                    if( test_words.indexOf(bad_word) != -1 ){
+                        possible_ability = false;
+                        break;
+                    }
+                }
             }
 
             if( possible_ability && last_line ) {
@@ -2129,6 +2184,16 @@ function delete_repeating(id, stub) {
         var attrs = attributes[IDs[i]];
         for(var name in attrs) {
             attrs[name].remove();
+        }
+    }
+    let objs = findObjs({
+	_type: 'attribute',
+	_characterid: id
+    });
+    for( var obj of objs ) {
+        let attr_name = obj.get('name');
+        if( attr_name == `_reporder_${stub}`) {
+            obj.remove();
         }
     }
 }
@@ -2580,10 +2645,7 @@ function show_generic_ability_buttons(msg, attr, type) {
     const [IDs, attributes] = getRepeatingSectionAttrs(id,attr);
 
     var message = [`/w ${msg.who} &{template:rolls} {{header=${name} ${type}}} {{desc=`]
-    log('noop');
-    log(IDs);
-    log(attributes);
-    log('boop');
+
     for(var i in IDs) {
         let name  = getAttrByName(id, `${attr}_${IDs[i]}_name`);
         message.push(`[${name}](!&#13;&#37;{selected|${attr}_${IDs[i]}_action-npc})`);
