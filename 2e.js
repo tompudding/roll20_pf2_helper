@@ -1327,6 +1327,9 @@ function is_lower_case(str) {
 
 var non_principals = ['a','an','the','in','with','by','of','on','and','or','but','to'];
 
+//Some of those really don't make sense as the last word in a title
+var non_enders = ['a','an','the','with','by','of','and','or','but','to'];
+
 function is_title_case(words) {
     //Title case is a bit more subtle than just all caps. We need the following:
     // * The first word is always caps
@@ -1374,6 +1377,7 @@ function format_ability_description(input, breaks) {
     input = input.replace(/Saving Throw/g,'**Saving Throw**');
     input = input.replace(/Trigger/g,'**Trigger**');
     input = input.replace(/Effect/g,'**Effect**');
+    input = input.replace(/Requirements/g,'**Requirements**');
     input = input.replace(/Stage 1/g,'**Stage 1**');
     input = input.replace(/Stage 2/g,'**Stage 2**');
     input = input.replace(/Stage 3/g,'**Stage 3**');
@@ -1960,10 +1964,17 @@ function load_pdf_data(input) {
                 // critical in them
                 possible_ability = false;
             }
-            let num_in_title = num_title_case(words) - 1;
-            if( possible_ability && num_in_title < 1 ) {
+            //We get the number in title case, because there should be a title followed by the first word of a sentence. That last word better not be lower case though otherwise it can't start a sentence
+            let num_in_title_case = num_title_case(words);
+            let num_in_title = num_in_title_case - 1;
+            if( possible_ability && num_in_title_case < 2 ) {
                 possible_ability = false;
             }
+
+            if( possible_ability && (false == is_upper_case(words[num_in_title_case - 1][0])) ) {
+                possible_ability = false;
+            }
+
             if( possible_ability ) {
                 //we can also rule out this ability if it's got any of a short list of bad words in it
                 let bad_words = ['GM'];
@@ -1973,6 +1984,10 @@ function load_pdf_data(input) {
                         possible_ability = false;
                         break;
                     }
+                }
+                //similarly if there are any full stops we can reject it
+                if(test_words.join(' ').indexOf('.') != -1) {
+                    possible_ability = false;
                 }
             }
 
