@@ -1172,8 +1172,49 @@ function parse_json_character(character, data) {
                             //they're a spontaneous spellcaster
                             prepared = true;
                         }
+                        //Rather than split on commas, we need to be a bit more careful, because of something
+                        //  like this on the balisse:
+                        // 2nd invisibility (at will, self only)
+                        let pos = 0;
+                        let spell_names = [];
 
-                        var spell_names = spell_info.split(', ');
+                        while(spell_info) {
+                            let next_comma = spell_info.indexOf(',');
+                            let next_paren = spell_info.indexOf('(');
+                            if( next_comma == -1 ) {
+                                spell_names.push(spell_info);
+                                break;
+                            }
+                            if( next_paren == -1 || next_comma < next_paren ) {
+                                spell_names.push(spell_info.slice(0, next_comma));
+                                spell_info = spell_info.slice(next_comma + 1);
+                                continue;
+                            }
+                            //There's a bracket next before the next comma, go until closed
+                            let num_open = 1;
+                            for(var n = next_paren + 1; n < spell_info.length; n++) {
+                                if( spell_info[n] == '(' ) {
+                                    num_open += 1;
+                                }
+                                else if( spell_info[n] == ')' ) {
+                                    num_open -= 1;
+                                    if( num_open == 0 ) {
+                                        break;
+                                    }
+                                }
+                            }
+                            //n now has the position of the closing brace...
+                            if( n >= spell_info.length || spell_info.slice(n).indexOf(',') == -1 ) {
+                                spell_names.push(spell_info);
+                                break;
+                            }
+                            //There's another comma after the closing brace!
+                            next_comma = n + spell_info.slice(n).indexOf(',');
+                            spell_names.push(spell_info.slice(0, next_comma));
+                            spell_info = spell_info.slice(next_comma + 1);
+                        }
+
+                        //var spell_names = spell_info.split(', ');
                         for( var spell_name of spell_names ) {
                             if( spell_name.trim() == '' ) {
                                 continue;
@@ -1772,7 +1813,8 @@ function load_pdf_data(input) {
                   spell_data = spell_data.slice(1).trim();
               }
 
-              let numerals = ['10th', '9th', '8th', '7th', '6th', '5th', '4th', '3rd', '2nd', '1st'];
+              //let numerals = ['10th', '9th', '8th', '7th', '6th', '5th', '4th', '3rd', '2nd', '1st'];
+              let numerals = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
               let spells = [];
 
               //Do we have focus points?
@@ -1795,6 +1837,13 @@ function load_pdf_data(input) {
               if( cantrips ) {
                   spell_data = spell_data.slice(0, cantrips.index);
               }
+              if( cantrips && cantrips[1] && cantrips[3]) {
+                  let cantrip_str = cantrips[3];
+                  if( cantrip_str.indexOf(';') != -1 ) {
+                      cantrip_str = cantrip_str.slice(0, cantrip_str.indexOf(';'));
+                  }
+                  spells.push(cantrip_str.trim());
+              }
               for(var i = 0; i < numerals.length; i++) {
                   let spell_level = '';
                   let index = spell_data.indexOf(numerals[i])
@@ -1803,12 +1852,12 @@ function load_pdf_data(input) {
                       if( spell_level.indexOf(';') != -1 ) {
                           spell_level = spell_level.slice(0, spell_level.indexOf(';'));
                       }
+                      spell_data = spell_data.slice(0, index);
                   }
                   spells.push(spell_level.trim());
               }
-              if( cantrips && cantrips[1] && cantrips[3]) {
-                  spells.push(cantrips[3].trim());
-              }
+              //TODO: Constant spells?
+
 
               let target = output;
               if( output.spells ) {
@@ -1823,7 +1872,7 @@ function load_pdf_data(input) {
               else {
                   output.spelltype = type;
               }
-              target.spells = spells;
+              target.spells = spells.reverse();
               target.cantriplevel = cantrip_level;
               target.spelldc = {value : DC};
               target.spellattack = {value : attack};
