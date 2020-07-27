@@ -13,8 +13,8 @@
 **done** set sheet to npc on parsing
          turn off critical rolling on parsing
          add config options
-         remove size and alignment from traits
-         spontaenous spellcasters number of slots
+**done** remove size and alignment from traits
+**done** spontaenous spellcasters number of slots
 
 Bugs:
 -----

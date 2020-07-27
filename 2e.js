@@ -893,6 +893,8 @@ function parse_json_character(character, data) {
     var cantrips    = false;
     var focusspells = false;
     var innate      = false;
+    var prepared    = false;
+    var spontaneous = false;
 
     for( var key of Object.keys(set_value) ) {
         set_attribute(character.id, set_value[key], '');
@@ -918,6 +920,8 @@ function parse_json_character(character, data) {
     delete_repeating(character.id, 'repeating_items-worn');
     disable_spellcaster(character.id);
     set_attribute(character.id, 'sheet_type', 'npc');
+    set_attribute(character.id, 'spellcaster_prepared', '0');
+    set_attribute(character.id, 'spellcaster_spontaneous', '0');
 
     for( var key of Object.keys(data) ) {
         log(key);
@@ -1108,6 +1112,8 @@ function parse_json_character(character, data) {
                             //cantrips
                             this_stub = `repeating_cantrip_`;
                             level = spell_datum['cantriplevel']
+                            //oddly the cantrip level field is called "cantrips_per_day"
+                            set_attribute(character.id, 'cantrips_per_day', level);
                             cantrips = true;
                         }
 
@@ -1115,7 +1121,24 @@ function parse_json_character(character, data) {
                             focusspells = true;
                         }
 
-                        var spell_names = spell_datum['spells'][i].split(', ');
+                        //If they're a spontaneous caster we expect it to tell us how many slots
+                        let spell_info = spell_datum['spells'][i];
+                        let slot_info_re = /^\s*\((\d+) slots\)/i;
+                        slot_info = slot_info_re.exec(spell_info);
+                        if( slot_info ) {
+                            spontaneous = true;
+                            spell_info = spell_info.slice(slot_info_re.lastIndex);
+                            if( slot_info[1] ) {
+                                set_attribute(character.id, `level_${level}_per_day`, slot_info[1]);
+                            }
+                        }
+                        else if( level > 0 && !this_focus ) {
+                            //If there any non-cantrip spells that don't include a number of slots, then
+                            //they're a spontaneous spellcaster
+                            spontaneous = true;
+                        }
+
+                        var spell_names = spell_info.split(', ');
                         for( var spell_name of spell_names ) {
                             if( spell_name.trim() == '' ) {
                                 continue;
@@ -1184,6 +1207,12 @@ function parse_json_character(character, data) {
     if( spells || cantrips || cantrips || innate) {
         enable_spellcaster(character.id, spells, cantrips, focusspells, innate);
         set_attribute(character.id, 'sort_normalspells', 'level');
+        if( prepared ) {
+            set_attribute(character.id, 'spellcaster_prepared', 'prepared');
+        }
+        if( spontaneous ) {
+            set_attribute(character.id, 'spellcaster_spontaneous', 'spontaneous');
+        }
     }
     set_attribute(character.id, 'npc_type','Creature');
     set_attribute(character.id, 'sheet_type', 'npc');
@@ -1209,7 +1238,7 @@ function is_lower_case(str) {
     return str == str.toLowerCase() && str != str.toUpperCase();
 }
 
-var non_principals = ['a','an','the','in','with','by','of','on','and','or','but'];
+var non_principals = ['a','an','the','in','with','by','of','on','and','or','but','to'];
 
 function is_title_case(words) {
     //Title case is a bit more subtle than just all caps. We need the following:
@@ -1277,6 +1306,18 @@ function format_ability_description(input, breaks) {
     return input
 }
 
+function num_title_case(words) {
+    if( words && words[0] && false == is_upper_case(words[0][0]) ) {
+        return 0;
+    }
+    for(var i = 0; i < words.length; i++) {
+        if( false == is_upper_case(words[i][0]) && (non_principals.indexOf(words[i]) == -1) ) {
+            return i;
+        }
+    }
+    return words.length;
+}
+
 function new_ability(description_data, ability_type) {
     let description = description_data.line;
     let output = {type : ability_type};
@@ -1293,14 +1334,13 @@ function new_ability(description_data, ability_type) {
 
 
     words = description.split(' ');
-    for(var i = 0; i < words.length; i++) {
-        if( false == is_upper_case(words[i][0]) && (non_principals.indexOf(words[i]) == -1) ) {
-            break;
-        }
-    }
+    var i = num_title_case(words);
+
     let title_end = i;
     let trait_start = i;
     let description_start = i;
+    log('i=' + i);
+    log(words);
 
     if( i >= 1 && i < words.length ) {
         if( words[i][0] == '[' ) {
@@ -1313,7 +1353,7 @@ function new_ability(description_data, ability_type) {
             }
         }
 
-        if( words[trait_start][0] == '(') {
+        if( words[trait_start] && words[trait_start][0] == '(') {
             //blah
         }
         else if( action == 'none' ) {
@@ -1524,10 +1564,10 @@ function load_pdf_data(input) {
         },
         //For the saves line we're expecting something of the form AC [number]; Fort +/-[number] (possible
         //note for the save), Ref +/[number] (possible note for the save)
-        { re : RegExp('^(AC\\s*\\d.*;.*)$', 'i'),
+        { re : RegExp('^(AC\\s*\\d.*[;,].*)$', 'i'),
           func : (match) => {
               log('Saves');
-              let data = /AC\s(\d+)\s*(\(.*\))?;\s*Fort\s*[+-]?(\d+)\s*(\(.*?\))?,\s*Ref\s*[+-]?(\d+)\s*(\(.*?\))?,\s*Will\s*[+-]?(\d+)\s*(\(.*?\))?;?\s*\s*(.*)/i.exec(match[0]);
+              let data = /AC\s(\d+)\s*(\(.*\))?[;,]\s*Fort\s*[+-]?(\d+)\s*(\(.*?\))?,\s*Ref\s*[+-]?(\d+)\s*(\(.*?\))?,\s*Will\s*[+-]?(\d+)\s*(\(.*?\))?;?\s*\s*(.*)/i.exec(match[0]);
               if( null == data ) {
                   log('no match');
                   log(match[0]);
@@ -1647,9 +1687,11 @@ function load_pdf_data(input) {
               if( trait == 'N' ||
                   (trait.length == 2 && 'LNC'.indexOf(trait[0]) != -1 && 'GNE'.indexOf(trait[1]) != -1 )) {
                   output.alignment = trait;
+                  return true;
               }
               if( valid_sizes.indexOf(trait.toLowerCase()) != -1 ) {
                   output.size = trait.trim();
+                  return true;
               }
               if( !output.traits ) {
                   output.traits = [match[0].trim()];
@@ -1825,21 +1867,24 @@ function load_pdf_data(input) {
                 // critical in them
                 possible_ability = false;
             }
-
-            if( possible_ability && false == is_title_case(words.slice(0, 2)) ) {
+            if( possible_ability && num_title_case(words) < 2 ) {
                 possible_ability = false;
             }
 
             if( possible_ability && last_line ) {
                 //So we've got title case, but what if we have just started a sentance?
                 //TODO: We could also rule out the creatures name here?
+
                 let last_index = last_line.lastIndexOf('.');
                 let last_sentence = '';
                 if( last_index != -1 ) {
-                    last_sentence = last_line.slice(last_index);
-                    words = last_sentence.split(' ');
-                    if( words.length <= 2 ) {
-                        possible_ability = false;
+                    last_sentence = last_line.slice(last_index + 1);
+                    words = last_sentence.trim();
+                    if(words) {
+                        words = words.split(' ');
+                        if( words.length > 0 && words.length <= 2 ) {
+                            possible_ability = false;
+                        }
                     }
                 }
             }
