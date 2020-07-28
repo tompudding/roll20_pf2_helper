@@ -11,7 +11,7 @@ Installation
 ------------
 As it's still in development, PF2 Helper is not available directly from Roll20. To use it, you need a Roll20 Plus account, add an API script to your game, and then copy-paste the contents of [pf2_helper.js](https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/pf2_helper.js) into the editor window of Roll20, and hit "Save Script"
 
-<img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/install.jpg" width="100" height="100">
+<center><img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/install.jpg" width="100" height="100"></center>
 
 Enemy Parsing
 =============
