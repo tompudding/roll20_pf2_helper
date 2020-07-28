@@ -40,8 +40,6 @@ function parse_roll(to_hit, die_result, threat) {
 }
 
 function title_case(text) {
-    log('title case');
-    log(text);
     return text.replace(
         /(\w)(\w*)/g,
         (_, firstChar, rest) => firstChar.toUpperCase() + rest.toLowerCase()
@@ -443,7 +441,6 @@ const getRepeatingSectionAttrs = function (charid, prefix) {
 };
 
 function roll_secret_skill(msg) {
-    log(msg.selected);
     let characters = [];
     for( var obj_id of msg.selected ) {
         //Grab the character represented by these
@@ -502,8 +499,6 @@ function roll_secret_skill(msg) {
         else {
             bonus = getAttrByName(characters[i].id, skill);
         }
-        log('jimly');
-        log(bonus);
         let name = getAttrByName(characters[i].id, 'character_name');
         let sheet_type = getAttrByName(characters[i].id, 'sheet_type');
 
@@ -848,7 +843,6 @@ function parse_json_character(character, data) {
     set_attribute(character.id, 'roll_show_notes','[[1]]');
 
     for( key of Object.keys(data) ) {
-        log(key);
         if( key == 'name' ) {
             //This one isn't an attribute, it's special
             character.set('name', title_case(data[key]));
@@ -858,8 +852,6 @@ function parse_json_character(character, data) {
             if( match ) {
                 let speed = '0';
                 let notes = '';
-                log('SPEEED');
-                log(match);
                 if( match[1] ) {
                     speed = match[1];
                     if( match[2] ) {
@@ -1345,8 +1337,6 @@ function new_ability(description_data, ability_type) {
 
     let words = description.split(' ');
     var i = num_in_title(words);
-    log(words);
-    log(i);
 
     let title_end = i;
     let trait_start = i;
@@ -1488,7 +1478,7 @@ function load_pdf_data(input) {
     matchers = [
         { re   : RegExp('^.*CREATURE\\s+([+-]?\\d+)\\s*(.*)','ig'),
           func : (match) => {
-              log('creature feature');
+              log('Parsing Creature tag');
               output.level = parseInt(match[1]);
               output.traits = match[2].split(/[ ,]+/);
               return true;
@@ -1498,6 +1488,7 @@ function load_pdf_data(input) {
         //Perception is usually followed by a semicolon, but the sinspawn has a comma
         { re   : RegExp('^.*Perception\\s+\\+?(\\d+)[;,]?\\s*(.*)','ig'),
           func : (match) => {
+              log('Parsing senses');
               let senses = '';
               if( match[2] ) {
                   senses = match[2].trim();
@@ -1511,7 +1502,7 @@ function load_pdf_data(input) {
         },
         { re : RegExp('^Languages\\s+(.*)'),
           func : (match) => {
-              log('Got languages');
+              log('Parsing languages');
               output.languages = match[1].trim();
               return true;
           },
@@ -1519,7 +1510,7 @@ function load_pdf_data(input) {
         },
         { re : RegExp('^Skills\\s+(.*)'),
           func : (match) => {
-              log('skills');
+              log('Parsing skills');
 
               for( var skill_text of match[1].split(',') ) {
 
@@ -1587,7 +1578,7 @@ function load_pdf_data(input) {
         },
         { re : RegExp('^Items\\s*(.*)'),
           func : (match) => {
-              log('Got Items');
+              log('Parsing Items');
               output.items = match[1].trim();
               return true;
           },
@@ -1597,10 +1588,10 @@ function load_pdf_data(input) {
         //note for the save), Ref +/[number] (possible note for the save)
         { re : RegExp('^(AC\\s*\\d.*[;,].*)$', 'i'),
           func : (match) => {
-              log('Saves');
+              log('Parsing AC and Saves');
               let data = /AC\s(\d+)\s*(\(.*\).*?)?[;,]\s*Fort\s*[+-]?(\d+)\s*(\(.*?\))?,\s*Ref\s*[+-]?(\d+)\s*(\(.*?\))?,\s*Will\s*[+-]?(\d+)\s*(\(.*?\))?;?\s*\s*(.*)/i.exec(match[0]);
               if( null == data ) {
-                  log('no match');
+                  log('Invalid AC line:');
                   log(match[0]);
                   return;
               }
@@ -1636,10 +1627,11 @@ function load_pdf_data(input) {
         // printed at some point with those things in a different order, so we'll put it out in more than one regexp
         { re : RegExp('^HP\\s*(\\d+).*','i'),
           func : (match) => {
-              log('HP and defences');
+              log('Parsing HP and defences');
               let data = /HP\s(\d+)\s*(,\s*(.*?);)?(.*)$/i.exec(match[0]);
               if( null == data ) {
-                  log('no match');
+                  log('Invalid HP line:')
+                  log(match[0]);
                   return;
               }
 
@@ -1684,7 +1676,7 @@ function load_pdf_data(input) {
         // The speeds also needn't be in order
         { re : RegExp('^Speed\\s*(.*)','i'),
           func : (match) => {
-              log('speeds');
+              log('Parsing Speeds');
               output.speed = match[1];
               return true;
           },
@@ -1693,7 +1685,7 @@ function load_pdf_data(input) {
         //These are some abilities that don't end in a full stop, because they're universal monster rules or whatever.
         { re  : RegExp('^Golem Antimagic(.*)$',''),
           func : (match) => {
-              log('Golem Antimagic');
+              log('Found Golem Antimagic');
               //we don't parse them here as we want them processed as an ability, but causing this to match
               //allows our "first ability" tracker to be accurate
           },
@@ -1701,7 +1693,7 @@ function load_pdf_data(input) {
         },
         { re  : RegExp('^Frightful Presence(.*)$',''),
           func : (match) => {
-              log('Frightful presence');
+              log('Found Frightful presence');
               //we don't parse them here as we want them processed as an ability, but causing this to match
               //allows our "first ability" tracker to be accurate
           },
@@ -1783,8 +1775,8 @@ function load_pdf_data(input) {
         //Spells
         { re  : RegExp('^(.*)Spells DC (\\d+)(.*attack ([+-]\\d+))?(.*)$',''),
           func : (match) => {
-              log('Got spells');
-              log(match);
+              log('Parsing spells');
+
               if( null == match || !match[1] || !match[2] ) {
                   return;
               }
@@ -1840,7 +1832,6 @@ function load_pdf_data(input) {
                           //just just put it in as a spell with (constant) after it
                           spells[level].push(spell + ' (constant)');
                       }
-                      log(`Constant level ${level} ${constant_spells}`);
                   }
                   spell_data = spell_data.slice(0, constant.index);
               }
@@ -1905,14 +1896,13 @@ function load_pdf_data(input) {
               target.spellattack = {value : attack};
               target.focuspoints = focus_points;
 
-              log(spells);
               return true;
           },
           name : 'spells',
         },
         { re  : RegExp('^(.*)Rituals DC (\\d+)(.*attack ([+-]\\d+))?(.*)$',''),
           func : (match) => {
-              log('Rituals');
+              log('Parsing Rituals');
               //we don't parse them here as we want them processed as an ability, but causing this to match
               //allows our "first ability" tracker to be accurate
           },
@@ -1923,14 +1913,14 @@ function load_pdf_data(input) {
         // things. Note that melee and ranged should already have been picked up, so this ought to get
         // abilities
         { re : RegExp('^.*(\\[one-action\\]|\\[two-actions\\]|\\[three-actions\\]|\\[reaction\\]|\\[free-action\\]).*'),
-          func : (match) => {log('action');},
+          func : (match) => {log('Found action ability')},
           name : 'action',
         },
 
         // Poisons and diseases don't have the action symbol (as they're usually delivered by some other
         // mechanism), but they should have a list of traits, one of which will be poison or disease.
         { re : RegExp('^.*(\\([^\\)]*(poison|disease).*\\)).*'),
-          func : (match) => {log('affliction');},
+          func : (match) => {log('Found Affliction');},
           name : 'affliction',
         },
     ];
@@ -1968,9 +1958,8 @@ function load_pdf_data(input) {
                 if( match ) {
                     matched[matchers[i].name] = true;
                     //when we hit speeds we're in the offensve abilites so we should reset the first count
-                    log(matchers[i].name);
+                    log('Match on: ' + matchers[i].name);
                     if( matchers[i].name == 'speeds' || matchers[i].name == 'saves' ) {
-                        log('SET FA');
                         first_ability = true;
                     }
                     if( matchers[i].name == 'affliction' || matchers[i].name == 'action' ) {
@@ -1984,7 +1973,7 @@ function load_pdf_data(input) {
             for( var i = 0; i < multi_matchers.length; i++) {
                 match = multi_matchers[i].re.exec(line);
                 if( match ) {
-                    log('mutlimatch ' + multi_matchers[i].name);
+                    log('Match on ' + multi_matchers[i].name);
                     if( multi_matchers[i].name == 'affliction' || multi_matchers[i].name == 'action' ) {
                         first_ability = false;
                     }
@@ -1998,7 +1987,6 @@ function load_pdf_data(input) {
             // only way to tell here is to look at if the first two words are in title case.
             let words = line.split(' ');
             var possible_ability = words.length > 2;
-            log('PA 1: ' + line);
             if( possible_ability ) {
                 if( words[0] == 'Critical' && (words[1] =='Success' || words[1] == 'Failure') ) {
                     possible_ability = false;
@@ -2022,8 +2010,6 @@ function load_pdf_data(input) {
             if( possible_ability && num_title < 1 ) {
                 possible_ability = false;
             }
-            log(words);
-            log(num_title);
             let title_words = words.slice(0, num_title);
             let putative_title = title_words.join(" ").trim();
 
@@ -2076,8 +2062,6 @@ function load_pdf_data(input) {
             if( possible_ability && last_line ) {
                 //So we've got title case, but what if we have just started a sentance?
                 //TODO: We could also rule out the creatures name here?
-                log('jimbo21 ' + first_ability);
-                log(line);
                 let last_index = last_line.lastIndexOf('.');
                 let last_sentence = '';
                 if( false == first_ability ) {
@@ -2108,9 +2092,6 @@ function load_pdf_data(input) {
             }
             else {
                 first_ability = false;
-                log("PA: " + line);
-                log(words);
-                log('---');
             }
         }
 
@@ -2124,6 +2105,7 @@ function load_pdf_data(input) {
         final_lines.push( join_ability_lines(current_lines) );
     }
     matched = {};
+    log('Starting second pass...');
 
     for(var line_data of final_lines) {
         // We take each line on its own, and decide what to do with it based on its content, and which things
@@ -2142,7 +2124,7 @@ function load_pdf_data(input) {
             matchers[i].re.lastIndex = 0;
             match = matchers[i].re.exec(line);
             if( match != null ) {
-                log('match on ' + matchers[i].name);
+                log('Second pass match on ' + matchers[i].name);
                 handled = matchers[i].func(match);
                 remove = i;
                 matched[matchers[i].name] = true;
@@ -2159,7 +2141,7 @@ function load_pdf_data(input) {
             multi_matchers[i].re.lastIndex = 0;
             match = multi_matchers[i].re.exec(line);
             if( match ) {
-                log('match on ' + multi_matchers[i].name);
+                log('Second pass match on ' + multi_matchers[i].name);
                 handled = multi_matchers[i].func(match);
                 matched[multi_matchers[i].name] = true;
                 break;
@@ -2173,8 +2155,6 @@ function load_pdf_data(input) {
         // haven't had the saves yet it's an interactive ability, if we haven't had the speeds yet it's an
         // automatic or reactive ability, and if we have it's an offensive ability
 
-        log('Unhandled line:');
-        log(line);
         let ability_type = 'general';
         if( 'speeds' in matched ) {
             ability_type = 'offense';
@@ -2185,17 +2165,15 @@ function load_pdf_data(input) {
         output.specials.push(new_ability(line_data, ability_type));
     }
     output.traits = output.traits.join(", ");
-    log(output);
     return output;
 }
 
 function get_and_parse_character(msg) {
-    log(msg.selected);
     var id = RegExp("{{id=([^}]*)}}").exec(msg.content)[1];
     var unknown_name = /{{unknown_name=(.*?)}}/g.exec(msg.content);
 
     if( unknown_name && unknown_name[1] ) {
-        log(unknown_name[1]);
+        log('Using unknown name ' + unknown_name[1]);
         set_attribute(id, 'unknown_name', unknown_name[1]);
     }
     else {
@@ -2203,11 +2181,8 @@ function get_and_parse_character(msg) {
     }
 
     var character = getObj("character", id);
-    log('character =' + character);
 
     //GM notes are asynchronous
-
-    log(character);
     character.get(
         'gmnotes',
         (notes) => {
@@ -2255,9 +2230,6 @@ function get_and_parse_character(msg) {
 }
 
 function handle_api(msg) {
-    //log(msg.content);
-    //log(msg.inlinerolls);
-    //log(msg.selected);
     let command = msg.content.match('!([^\\s]+)');
     if( null == command || command.length < 2 ) {
         return;
@@ -2276,7 +2248,7 @@ function handle_api(msg) {
                    };
 
     command = command[1];
-    log('command: ' + command);
+    log('Handling Command: ' + command);
 
     if( command in handlers ) {
         return handlers[command](msg);
@@ -2287,13 +2259,6 @@ function handle_whisper(msg) {
     if(undefined == msg.inlinerolls || msg.target != 'gm' || (!playerIsGM(msg.playerid) && msg.playerid != 'API')) {
         return;
     }
-    //log('whisper');
-    log(msg.content);
-    log(msg.inlinerolls);
-    log('***');
-    //log(msg.playerid);
-    //log(msg.target);
-    //log(msg.rolltemplate);
     let roll = null;
 
     if(msg.content.match('name=\\^{traits}}}')) {
@@ -2383,7 +2348,6 @@ function disable_spellcaster(id) {
         toggles = '';
         set_attribute(id, 'toggles', toggles);
     }
-    log(`Initial toggles "${toggles}"`);
 
     toggles = toggles.split(',');
     var new_toggles = [];
@@ -2394,7 +2358,6 @@ function disable_spellcaster(id) {
     }
 
     for(var toggle of toggles) {
-        log(toggle,ignore);
         if( ignore.includes(toggle) ) {
             continue;
         }
@@ -2402,7 +2365,6 @@ function disable_spellcaster(id) {
     }
     let toggle_string = new_toggles.join(',');
 
-    log(`Setting toggles to "${toggle_string}"`);
     set_attribute(id, 'toggles', toggle_string);
 }
 
@@ -2411,8 +2373,6 @@ function enable_spellcaster(id, spells, cantrips, focusspells, innate) {
     if( toggles == undefined ) {
         toggles = '';
     }
-
-    log(`initial toggles "${toggles}"`);
 
     let bools = [innate, focusspells, cantrips, spells];
     let toggle_names = ['innate','focus','cantrips','normalspells']
@@ -2430,7 +2390,6 @@ function enable_spellcaster(id, spells, cantrips, focusspells, innate) {
     if( toggles != '' ) {
         toggle_string = toggles + ',' + toggle_string;
     }
-    log(`setting toggles to "${toggle_string}"`);
     set_attribute(id, 'toggles', toggle_string);
 }
 
@@ -2609,8 +2568,6 @@ function show_attack_buttons(msg) {
     i = add_attacks(id, 'info', i, 'melee', message);
     add_attacks(id, 'info', i, 'ranged', message);
 
-    log(message.join(" "));
-
     sendChat(module_name, message.join(" ") );
 }
 
@@ -2671,7 +2628,6 @@ function add_full_spells(id, spell_type, spell_type_name, message) {
         if(!(level >= 1 && level <= 10)) {
             level = 1;
         }
-        //log('name=' + name + ' level=' + level)
         spell_levels[level].push(`[${name}](!&#13;&#37;{selected|repeating_${spell_type}_$${i}_npcspellroll}) `);
     }
 
@@ -2714,8 +2670,6 @@ function show_spell_buttons(msg) {
     i = add_spells(id, i, 'cantrip', 'Cantrips', message);
     add_full_spells(id, 'normalspells', 'Spells', message);
 
-    log(message)
-
     sendChat(module_name, message.join(" ") );
 }
 
@@ -2751,11 +2705,9 @@ function show_secret_skills_buttons(msg) {
             }
         }
     }
-    log(all_lores);
     for( var lore_name of all_lores ) {
         message.push(`[${lore_name}](!secret-skill {{skill=${lore_name}&#125;})`);
     }
-    log(message);
     message.push('}}')
 
     sendChat(module_name, message.join(" "));
@@ -2825,7 +2777,6 @@ function show_skills_buttons(msg) {
         }
         message.push(`[${lore_name}](!&#13;&#37;{selected|repeating_lore_${IDs[i]}_LORE})`);
     }
-    log(message);
     show_list_buttons(message);
 }
 
@@ -2847,8 +2798,6 @@ on('change:campaign:turnorder', function() {
         turnorder = JSON.parse(turnorder);
 
         //Get the person at the top of the order
-        log('jim');
-        log(turnorder[0]['id']);
         turn_off_marker_token(turnorder[0]['id'], 'Reaction');
     }
     catch(err) {
