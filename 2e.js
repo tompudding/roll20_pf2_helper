@@ -1412,6 +1412,9 @@ function num_title_case(words) {
     return words.length;
 }
 
+//These abilities weirdly start with a lower case latter
+var lower_case_abilities = ['Golem Antimagic']
+
 function num_in_title(words) {
     let n = num_title_case(words);
     //words which ought never appear in an ability name
@@ -1422,6 +1425,15 @@ function num_in_title(words) {
     // description must start with a capital letter regardless, so step backwards until that is satisfied
     while(n > 0 && words[n] && is_lower_case(words[n][0]) ) {
         n -= 1;
+    }
+
+    //Golem Antimagic (and possibly other template-style) abilities don't start their ability blocks with a capital letter.
+
+    for( var silly_ability of lower_case_abilities ) {
+        if( words.slice(0, n+1).join(" ").indexOf(silly_ability) != -1 ) {
+            n += 1;
+            break;
+        }
     }
 
     // Next we know that some words will never appear in an ability name (like DC)
@@ -1546,6 +1558,7 @@ function join_ability_lines(lines) {
 }
 
 function load_pdf_data(input) {
+
     input = input.replace(/&nbsp;/g,' ')
     input = input.replace(/(<p[^>]+?>|<p>|<div>|<\/div>)/ig, "");
     //Paizo sometimes uses weird symbols for minus
@@ -1797,6 +1810,23 @@ function load_pdf_data(input) {
           },
           name : 'speeds',
         },
+        //These are some abilities that don't end in a full stop, because they're universal monster rules or whatever.
+        { re  : RegExp('^Golem Antimagic(.*)$',''),
+          func : (match) => {
+              log('Golem Antimagic');
+              //we don't parse them here as we want them processed as an ability, but causing this to match
+              //allows our "first ability" tracker to be accurate
+          },
+          name : 'golem antimagic',
+        },
+        { re  : RegExp('^Frightful Presence(.*)$',''),
+          func : (match) => {
+              log('Frightful presence');
+              //we don't parse them here as we want them processed as an ability, but causing this to match
+              //allows our "first ability" tracker to be accurate
+          },
+          name : 'frightful presence',
+        },
     ];
 
     multi_matchers = [
@@ -2033,7 +2063,6 @@ function load_pdf_data(input) {
     // The first pass will be to fold lines together so we have one line for each thing. The only difficult
     // part to that is special abilities that don't have an action because we can't match on an initial
     // keyword and we lose the bold in the next form. We'll try using if the first n words are capitalized and
-
     //for(var line of lines.slice(1)) {
     for(var line_num = 1; line_num < lines.length; line_num++) {
         let line = lines[line_num];
@@ -2050,6 +2079,7 @@ function load_pdf_data(input) {
         if( !line ) {
             continue;
         }
+
         let match = null;
         // Next we check to see if it matches any of our special matchers
         for( var i = 0; i < matchers.length; i++) {
@@ -2074,6 +2104,10 @@ function load_pdf_data(input) {
             for( var i = 0; i < multi_matchers.length; i++) {
                 match = multi_matchers[i].re.exec(line);
                 if( match ) {
+                    log('mutlimatch ' + multi_matchers[i].name);
+                    if( matchers[i].name == 'affliction' || matchers[i].name == 'action' ) {
+                        first_ability = false;
+                    }
                     break;
                 }
             }
@@ -2110,17 +2144,19 @@ function load_pdf_data(input) {
             }
             log(words);
             log(num_title);
+            let title_words = words.slice(0, num_title);
+            let putative_title = title_words.join(" ").trim();
 
             if( possible_ability ) {
                 //we can also rule out this ability if it's got any of a short list of bad words in it
                 let bad_words = ['GM'];
                 //Or if it's exactly equal to something no ability would be called
-                let bad_titles = ['damage','stage','hit','constant','effect','requirement','the','any'];
+                let bad_titles = ['damage','stage','hit','constant','effect','requirement','the','any','trigger'];
                 let bad_chars = ['+','-','.'];
-                let test_words = words.slice(0, num_title);
-                let putative_title = test_words.join(" ").trim();
+
+
                 for( bad_word of bad_words ) {
-                    if( test_words.indexOf(bad_word) != -1 ){
+                    if( title_words.indexOf(bad_word) != -1 ){
                         possible_ability = false;
                         break;
                     }
@@ -2149,7 +2185,10 @@ function load_pdf_data(input) {
                     // a list of traits (blah, jim)
                     // a capital letter of a description
                     if( words[num_title][0] != '(' && words[num_title][0] != '[' ){
-                        possible_ability = false;
+                        //There's one case, Golem Antimagic text block doesn't start with caps
+                        if( lower_case_abilities.indexOf(putative_title) == -1 ) {
+                            possible_ability = false;
+                        }
                     }
                 }
             }
