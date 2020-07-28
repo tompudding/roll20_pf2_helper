@@ -60,7 +60,7 @@ class Attack {
         this.extra_crit_damage = extra_crit_damage;
         this.die_result = die_result;
         if( die_result == 20 ) {
-            play('critical_thread');
+            play('critical_threat');
         }
         else if( die_result == 1 ) {
             play('fan_fumble');
@@ -839,7 +839,14 @@ function parse_json_character(character, data) {
     set_attribute(character.id, 'spellcaster_prepared', '0');
     set_attribute(character.id, 'spellcaster_spontaneous', '0');
     set_attribute(character.id, 'roll_option_critical_damage','none');
-    set_attribute(character.id, 'whispertype','/w gm ');
+    let whisper_type;
+    if( state.pf2_helper.hide_rolls ) {
+        whisper_type = '/w gm ';
+    }
+    else {
+        whisper_type = '0';
+    }
+    set_attribute(character.id, 'whispertype',whisper_type);
     set_attribute(character.id, 'roll_show_notes','[[1]]');
 
     for( key of Object.keys(data) ) {
@@ -2229,22 +2236,53 @@ function get_and_parse_character(msg) {
     );
 }
 
+function show_config_options(msg) {
+    let command = /!pf2-config (.*)/.exec(msg.content);
+    let message = [`/w ${msg.who} &{template:default} {{name=${module_name} Config}}`];
+    let extra_message = '';
+
+    if( command && command[1] ) {
+        extra_message = '{{Re-parse NPCs to use new values=}}';
+        switch(command[1]) {
+        case 'toggle_hide':
+            state.pf2_helper.hide_rolls = !state.pf2_helper.hide_rolls;
+            break;
+        case 'toggle_popups':
+            state.pf2_helper.use_map_popups = !state.pf2_helper.use_map_popups;
+            break;
+        case 'toggle_other_popups':
+            state.pf2_helper.use_other_popups = !state.pf2_helper.use_other_popups;
+            break;
+        default:
+            extra_message = ''
+        }
+    }
+
+    message.push(`{{Default NPC hide rolls=[${state.pf2_helper.hide_rolls}](!pf2-config toggle_hide)}}`)
+    message.push(`{{Use MAP popups=[${state.pf2_helper.use_map_popups}](!pf2-config toggle_popups)}}`)
+    message.push(`{{Use Sweep/other popups=[${state.pf2_helper.use_other_popups}](!pf2-config toggle_other_popups)}}`)
+    message.push(extra_message);
+
+    sendChat(module_name, message.join(' '));
+}
+
 function handle_api(msg) {
     let command = msg.content.match('!([^\\s]+)');
     if( null == command || command.length < 2 ) {
         return;
     }
-    let handlers = {'attacks'        : show_attack_buttons,
-                    'skills'         : show_skills_buttons,
-                    'ability-checks' : show_ability_check_buttons,
-                    'saves'          : show_save_buttons,
-                    'abilities'      : show_ability_buttons,
-                    'spells'         : show_spell_buttons,
-                    'secret-skill'   : roll_secret_skill,
-                    'secret-skills'  : show_secret_skills_buttons,
-                    'secret'         : roll_secret,
-                    'parse'          : get_and_parse_character,
+    let handlers = {'pf2-attacks'        : show_attack_buttons,
+                    'pf2-skills'         : show_skills_buttons,
+                    'pf2-ability-checks' : show_ability_check_buttons,
+                    'pf2-saves'          : show_save_buttons,
+                    'pf2-abilities'      : show_ability_buttons,
+                    'pf2-spells'         : show_spell_buttons,
+                    'pf2-secret-skill'   : roll_secret_skill,
+                    'pf2-secret-skills'  : show_secret_skills_buttons,
+                    'pf2-secret'         : roll_secret,
+                    'pf2-parse'          : get_and_parse_character,
                     //'init'           : roll_init,
+                    'pf2-config'         : show_config_options,
                    };
 
     command = command[1];
@@ -2478,7 +2516,7 @@ function add_attacks(id, roll_type, roll_num, attack_type, message) {
         }
         let damage = attrs.weapon_strike_damage;
         if(damage) {
-            if( sheet_type == 'npc' && traits.toLowerCase().includes('forceful') ) {
+            if( state.pf2_helper.use_other_popupes && sheet_type == 'npc' && traits.toLowerCase().includes('forceful') ) {
                 //We want to add a bonus to damage
                 let new_damage = add_forceful(damage);
                 if( new_damage ) {
@@ -2510,7 +2548,7 @@ function add_attacks(id, roll_type, roll_num, attack_type, message) {
                 new_bonus = new_bonus.toString();
             }
             //At this point we can check if the macro has been added to the weapon strike, and update it if not!
-            if( sheet_type == 'npc' && new_bonus.indexOf('?{Attack') == -1 ) {
+            if( sheet_type == 'npc' && state.pf2_helper.use_map_popups && new_bonus.indexOf('?{Attack') == -1 ) {
                 //This means we take the bonus as correct and update the weapon strike with our macro, but we
                 //first need to check if agile is one of the traits
                 if(false == new_bonus.endsWith('+')) {
@@ -2526,7 +2564,7 @@ function add_attacks(id, roll_type, roll_num, attack_type, message) {
                 bonus.set('current',new_bonus);
             }
         }
-        if( sheet_type == 'npc' && traits.toLowerCase().includes('sweep') ) {
+        if( state.pf2_helper.use_other_popups && sheet_type == 'npc' && traits.toLowerCase().includes('sweep') ) {
             let new_bonus = add_sweep(bonus);
             if( new_bonus ) {
                 bonus.set('current', new_bonus);
@@ -2819,6 +2857,14 @@ on('change:campaign:initiativepage', function() {
 });
 
 on("ready", function() {
+    if( !state.pf2_helper ) {
+        state.pf2_helper = {
+            hide_rolls : true,
+            use_map_popups : true,
+            use_other_popups : true,
+        };
+    }
+
     // On page creation we're going to make sure the table has all the macros we know will be wanted. This
     // might annoy GMs if they've deleted a macro they don't want and we keep creating it, so we should allow
     // this to be turned off somehow
@@ -2826,58 +2872,58 @@ on("ready", function() {
     let required_macros = [
         {
             name : 'abilities',
-            require : '!abilities',
+            require : '!pf2-abilities',
             token_action : true,
         },
         {
             name : 'ability-checks',
-            require : '!ability-checks',
+            require : '!pf2-ability-checks',
             token_action : true,
         },
         {
             name : 'attacks',
-            require : '!attacks',
+            require : '!pf2-attacks',
             token_action : true,
         },
         {
             name : 'parse',
-            require : '!parse',
-            full : '!parse {{id=@{selected|character_id}}} {{unknown_name=?{What name should the players see? Set to empty string to use actual name|Scary Monster}}}',
+            require : '!pf2-parse',
+            full : '!pf2-parse {{id=@{selected|character_id}}} {{unknown_name=?{What name should the players see? Set to empty string to use actual name|Scary Monster}}}',
             token_action : false,
         },
         {
             name : 'saves',
-            require : '!saves',
+            require : '!pf2-saves',
             token_action : true,
         },
         {
             name : 'secret',
-            require : '!secret',
-            full : '!secret {{bonus=?{Enter your skill bonus:|0}}}',
+            require : '!pf2-secret',
+            full : '!pf2-secret {{bonus=?{Enter your skill bonus:|0}}}',
             token_action : true,
             all_players : true,
         },
         {
             name : 'secret-skills',
-            require : '!secret-skills',
-            full : '!secret-skills',
+            require : '!pf2-secret-skills',
+            full : '!pf2-secret-skills',
             token_action : true,
             all_players : true,
         },
-        // {
-        //     name : 'init',
-        //     require : '!init',
-        //     full : '!init {{skill=?{Initiative Skill?|Perception|Acrobatics|Arcana|Athletics|Crafting|Deception|Diplomacy|Intimidation|Medicine|Nature|Occultism|Performance|Religion|Society|Stealth|Survival|Thievery}',
-        //     token_action : true,
-        // },
         {
             name : 'skills',
-            require : '!skills',
+            require : '!pf2-skills',
             token_action : true,
         },
         {
+            name : 'pf2-config',
+            require : '!pf2-config',
+            full : '!pf2-config',
+            token_action : false,
+        },
+        {
             name : 'spells',
-            require : '!spells',
+            require : '!pf2-spells',
             token_action : true,
         },
     ]
@@ -2917,7 +2963,7 @@ on("ready", function() {
         let visibleto = '';
         let full = macro.full;
         if( !full ) {
-            full = macro.require + '{{id=@{selected|character_id}}}';
+            full = macro.require + ' {{id=@{selected|character_id}}}';
         }
         if( macro.all_players ) {
             visibleto = 'all';
