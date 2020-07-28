@@ -59,6 +59,14 @@ The secret-skills macro is analogous but more powerful. It allows clicking on a 
 </p>
 Again, if a player uses it, it announces in the chat that a roll has been made so the player gets some feedback.
 
-Bugs
+Config
+------
+You can use the config macro to enable or disable some features, such as the roll hiding and the MAP popups that are written into the macros.
+
+Sounds
+------
+If you have a sound called "critical_threat" it will play when an attack roll with a natural 20 is rolled in the chat. Similarly "fan_fumble" will play on a natural 1, and "roll_for_initiative" will play when the turn tracker appears.
+
+Bugs and Feature Requests
 ----
-Please send bug reports to tom.pudding@gmail.com
+Please send bug reports or feature requests to tom.pudding@gmail.com
