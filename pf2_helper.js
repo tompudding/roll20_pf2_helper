@@ -2810,8 +2810,9 @@ function show_list_buttons(message) {
 
 
 function show_skills_buttons(msg) {
-    var skill_names = ['ACROBATICS', 'ARCANA', 'ATHLETICS', 'CRAFTING', 'DECEPTION', 'DIPLOMACY', 'INTIMIDATION',
-    'MEDICINE', 'NATURE', 'OCCULTISM', 'PERFORMANCE', 'RELIGION', 'SOCIETY', 'STEALTH', 'SURVIVAL', 'THIEVERY'];
+    var skill_names = ['PERCEPTION', 'ACROBATICS', 'ARCANA', 'ATHLETICS', 'CRAFTING', 'DECEPTION', 'DIPLOMACY',
+                       'INTIMIDATION', 'MEDICINE', 'NATURE', 'OCCULTISM', 'PERFORMANCE', 'RELIGION', 'SOCIETY',
+                       'STEALTH', 'SURVIVAL', 'THIEVERY'];
     var id = RegExp("{{id=([^}]*)}}").exec(msg.content)[1];
     let message = get_list_buttons(msg, 'Skills', skill_names);
 
