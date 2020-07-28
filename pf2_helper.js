@@ -47,14 +47,14 @@ function title_case(text) {
 }
 
 class Attack {
-    constructor(to_hit, damage, damage_type, die_result, extra_crit_damage, fatal) {
+    constructor(to_hit, damage, additional_damage, damage_type, die_result, extra_crit_damage, fatal) {
         this.to_hit = to_hit;
-        this.damage = damage;
+        this.damage = damage + additional_damage;
         if(fatal) {
-            this.crit_damage = `((${fatal})*2)`;
+            this.crit_damage = `((${fatal} + ${additional_damage}[additional damage])*2)`;
         }
         else {
-            this.crit_damage = damage*2;
+            this.crit_damage = this.damage*2;
         }
         this.damage_type = damage_type;
         this.extra_crit_damage = extra_crit_damage;
@@ -234,8 +234,9 @@ class AttackRoll extends Roll {
         var to_hit = rolls.attack.roll.results.total;
         var die_result = rolls.attack.roll.results.rolls[0].results[0].v;
         var damage_type = rolls.damage.info;
+        var additional_damage = 0;
         if('damage_additional' in rolls) {
-            damage += rolls.damage_additional.roll;
+            additional_damage += rolls.damage_additional.roll;
             if(rolls.damage_additional.info) {
                 damage_type += ', ' + rolls.damage_additional.info;
             }
@@ -270,7 +271,7 @@ class AttackRoll extends Roll {
             }
         }
 
-        self.attack = new Attack(to_hit, damage, damage_type, die_result, extra_crit, fatal);
+        self.attack = new Attack(to_hit, damage, additional_damage, damage_type, die_result, extra_crit, fatal);
     }
 
     format() {
@@ -925,6 +926,7 @@ function parse_json_character(character, data) {
                 set_attribute(character.id, stub + 'weapon_strike_damage', damage.damage);
                 set_attribute(character.id, stub + 'weapon_strike_damage_type', damage.type);
                 set_attribute(character.id, stub + 'weapon_strike_damage_additional', damage.additional);
+                set_attribute(character.id, stub + 'roll_critical_damage_npc', ' ');
                 if( strike.notes ) {
                     set_attribute(character.id, stub + 'weapon_notes', strike.notes);
                 }
