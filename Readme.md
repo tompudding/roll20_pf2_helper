@@ -1,5 +1,5 @@
 PF2 Helper
-----------
+==========
 
 This is an Roll20 API script designed to help running Pathfinder Second Edition. It has three main features:
 
@@ -16,7 +16,7 @@ As it's still in development, PF2 Helper is not available directly from Roll20. 
 In your game you should see a number of macros get created in the Collection tab, I recommend setting "parse" and "pf2-config" to be in your bar.
 
 Enemy Parsing
-=============
+-------------
 To try parsing an enemy, add a character in the journal tab, and in the GM notes field, copy and paste the statblock for an enemy in from your PDF. Here I have done the Flytrap Leshy:
 
 <img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_paste.jpg" width="219" height="300" class="center">
@@ -28,3 +28,5 @@ It will pop up and ask you for the name your players will see. That's because wh
 With luck you'll see the message "Character Flytrap Leshy parsed successfully using PDF format" whispered to you in the chat, and the character should have been filled in as much as possible:
 
 <img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_parsed.jpg" width="270" height="228" class="center">
+
+It will also have set the first token bar to the hit points, and the second to the focus points for the creature, if they have them.

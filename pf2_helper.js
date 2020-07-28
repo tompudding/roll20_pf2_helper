@@ -162,7 +162,7 @@ function get_rolls(content, inlinerolls) {
         }
         //At least for now; "damage_additional" doesn't store the type in the corresponding "info" field, it puts it after the roll index. Whatevs
         var roll = null;
-        log('1');
+
         if(roll_name.match("additional")) {
             //There can be multiple rolls here, each with the type afterwards. We want to break them down,
             //total them up, and add the damage types to a string
@@ -1915,6 +1915,12 @@ function load_pdf_data(input) {
           },
           name : 'rituals',
         },
+        // Match actions that end with the action symbol first, so we give them a different name and don't
+        // expect them to end with a full stop.
+        { re : RegExp('^.*(\\[one-action\\]|\\[two-actions\\]|\\[three-actions\\]|\\[reaction\\]|\\[free-action\\])$'),
+          func : (match) => {log('Found short action ability')},
+          name : 'short_action',
+        },
         // Via some PDF magic it seems that we get action symbols translated into cool "[one-action]" type
         // text which we can use. It doesn't help us if it's a passive ability, but it helps with a lot of
         // things. Note that melee and ranged should already have been picked up, so this ought to get
@@ -2071,10 +2077,11 @@ function load_pdf_data(input) {
                 //TODO: We could also rule out the creatures name here?
                 let last_index = last_line.lastIndexOf('.');
                 let last_sentence = '';
+
                 if( false == first_ability ) {
                     //Abilities *ought* to end with a full stop. If this is the second or subsequent ability
                     //in this section we can rule out starting a new one if we're in the middle of a
-                    //sentence. Maybe
+                    //sentence. Maybe. The exception is a truncated ability like "attack of opportunity"
                     if( last_index == -1 ) {
                         possible_ability = false;
                     }
@@ -2171,7 +2178,8 @@ function load_pdf_data(input) {
         }
         output.specials.push(new_ability(line_data, ability_type));
     }
-    output.traits = output.traits.join(", ");
+
+    output.traits = output.traits.filter(x=>x).join(", ");
     return output;
 }
 
