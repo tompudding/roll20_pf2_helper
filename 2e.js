@@ -1,4 +1,4 @@
-var module_name = 'PF2 Helper'
+var module_name = 'PF2 Helper';
 
 function get_index(msg) {
     var roll_match = RegExp("\\$\\[\\[(\\d+)\\]\\]");
@@ -17,7 +17,7 @@ function get_index_extra(msg) {
     if( null == index ) {
         return null;
     }
-    return index[2]
+    return index[2];
 }
 
 function is_threat(roll) {
@@ -36,7 +36,7 @@ function set_attribute(id, attr_name, value) {
 }
 
 function get_attribute(id, attr_name) {
-    objs = findObjs({type : 'attribute', characterid:id, name:attr_name})
+    objs = findObjs({type : 'attribute', characterid:id, name:attr_name});
     if( objs.length == 0 ) {
         log('no attribute darn');
         return undefined;
@@ -46,13 +46,13 @@ function get_attribute(id, attr_name) {
 
 function parse_roll(to_hit, die_result, threat) {
     if(die_result == 1) {
-        return '[[1d1cs>2]] Fumble'
+        return '[[1d1cs>2]] Fumble';
     }
     else if(die_result == 20) {
-        return '[[1d1cf<0cs>1*20]] Natural Twenty!'
+        return '[[1d1cf<0cs>1*20]] Natural Twenty!';
     }
     else {
-        return `[[${to_hit}]]`
+        return `[[${to_hit}]]`;
     }
 }
 
@@ -111,9 +111,9 @@ class Attack {
 
         var damage = "";
         if(this.damage) {
-            damage = `{{roll02_name=^{damage}}} {{roll02=[[${this.damage}]]}} {{roll02_type=damage}} ${damage_type} {{roll03_name=^{critical_damage}}} {{roll03=[[${this.crit_damage} + ${this.extra_crit_damage}]]}} {{roll03_type=critical-damage}}`
+            damage = `{{roll02_name=^{damage}}} {{roll02=[[${this.damage}]]}} {{roll02_type=damage}} ${damage_type} {{roll03_name=^{critical_damage}}} {{roll03=[[${this.crit_damage} + ${this.extra_crit_damage}]]}} {{roll03_type=critical-damage}}`;
         }
-        return `{{roll01_name=^{attack}}} ${to_hit} ${damage}`
+        return `{{roll01_name=^{attack}}} ${to_hit} ${damage}`;
     }
 }
 
@@ -136,7 +136,7 @@ class Roll {
         this.name = getAttrByName(attacker.id, "unknown_name");
 
         if( undefined == this.name ) {
-            this.name = 'Strange Creature'
+            this.name = 'Strange Creature';
         }
 
         if( attr ) {
@@ -206,7 +206,7 @@ function get_rolls(content, inlinerolls) {
                     }
                     break;
                 }
-                log('yo ' + last_match + ' mi= ' + match.index)
+
                 if( last_match != null && match.index != last_match ) {
                     //There's in between stuff.
                     additional_types.push( results[1].substring(last_match, match.index) );
@@ -256,14 +256,14 @@ class AttackRoll extends Roll {
         if( rolls.length <= 1 ) {
             return;
         }
-        var damage = rolls['damage'].roll.results.total;
-        var to_hit = rolls['attack'].roll.results.total;
-        var die_result = rolls['attack'].roll.results.rolls[0].results[0].v
-        var damage_type = rolls['damage'].info
+        var damage = rolls.damage.roll.results.total;
+        var to_hit = rolls.attack.roll.results.total;
+        var die_result = rolls.attack.roll.results.rolls[0].results[0].v;
+        var damage_type = rolls.damage.info;
         if('damage_additional' in rolls) {
-            damage += rolls['damage_additional'].roll;
-            if(rolls['damage_additional'].info) {
-                damage_type += ', ' + rolls['damage_additional'].info;
+            damage += rolls.damage_additional.roll;
+            if(rolls.damage_additional.info) {
+                damage_type += ', ' + rolls.damage_additional.info;
             }
         }
 
@@ -281,13 +281,13 @@ class AttackRoll extends Roll {
 
             //for fatal we want to replace the first instance of [0-9]+d[0-9]+ with one more die and the type
             //set to the fatal type
-            var old_dice = RegExp("(\\d+)d(\\d+)","g").exec(rolls['damage'].roll.expression);
+            var old_dice = RegExp("(\\d+)d(\\d+)","g").exec(rolls.damage.roll.expression);
             if( old_dice.length > 2 ) {
                 var num_old = parseInt(old_dice[1]);
                 var type_old = old_dice[2];
 
-                var new_dice = `${num_old}${match[1]}`
-                fatal = rolls['damage'].roll.expression.replace(old_dice[0],new_dice);
+                var new_dice = `${num_old}${match[1]}`;
+                fatal = rolls.damage.roll.expression.replace(old_dice[0],new_dice);
                 if(extra_crit) {
                     extra_crit += '+' + `1${match[1]}`;
                 }
@@ -320,18 +320,18 @@ class SpellRoll extends Roll {
         if( rolls.length <= 1 ) {
             return;
         }
-        var damage = undefined;
-        var damage_type = undefined;
-        var to_hit = undefined;
-        var die_result = undefined;
+        var damage;
+        var damage_type;
+        var to_hit;
+        var die_result;
 
         if('damage' in rolls) {
-            damage = rolls['damage'].roll.results.total;
-            damage_type = rolls['damage'].info;
+            damage = rolls.damage.roll.results.total;
+            damage_type = rolls.damage.info;
         }
         if('attack' in rolls) {
-            to_hit = to_hit = rolls['attack'].roll.results.total;
-            die_result = rolls['attack'].roll.results.rolls[0].results[0].v
+            to_hit = to_hit = rolls.attack.roll.results.total;
+            die_result = rolls.attack.roll.results.rolls[0].results[0].v;
         }
         else {
             return;
@@ -356,7 +356,7 @@ class BasicRoll extends Roll{
         super(content, inlinerolls);
         var self = this;
         var s = `{{roll01=([^}]*)}}.*` +
-                `{{roll01_type=([^}]*)}}.*`
+            `{{roll01_type=([^}]*)}}.*`;
         var save_matcher = RegExp(s,"g");
         var array1 = save_matcher.exec(content);
 
@@ -378,28 +378,28 @@ class BasicRoll extends Roll{
     format() {
         var self = this;
         return `&{template:rolls} {{header=${this.name} ${this.header}}} {{subheader=${this.subheader}}}` +
-               `{{roll01=${this.result}}} {{roll01_type=${this.type}} {{notes_show=0}}`
+            `{{roll01=${this.result}}} {{roll01_type=${this.type}} {{notes_show=0}}`;
     }
 }
 
 class Save extends BasicRoll {
     constructor(content, inlinerolls) {
         super(content, inlinerolls);
-        this.type = 'saving-throw'
+        this.type = 'saving-throw';
     }
 }
 
 class AbilityCheck extends BasicRoll {
     constructor(content, inlinerolls) {
         super(content, inlinerolls);
-        this.type = 'ability'
+        this.type = 'ability';
     }
 }
 
 class Skill extends BasicRoll{
     constructor(content, inlinerolls) {
         super(content, inlinerolls);
-        this.type = 'skill'
+        this.type = 'skill';
     }
 }
 
@@ -407,7 +407,7 @@ class GenericAttack extends Roll{
     constructor(content, rolls) {
         super(content, rolls);
         var self = this;
-        var s = '{{name=\\^{(.*)}}}.*{{check=([^}]*)}}'
+        var s = '{{name=\\^{(.*)}}}.*{{check=([^}]*)}}';
         var matcher = RegExp(s,"g");
         var array1 = matcher.exec(content);
         //can I put this in the class and not instantiate it every time?
@@ -440,7 +440,7 @@ class GenericAttack extends Roll{
     format() {
         var self = this;
         var result = parse_roll(self.attack_total, self.die_result, false);
-        return `&{template:pf_ability} {{name=${self.attack_name}}} {{Result=${result}}}`
+        return `&{template:pf_ability} {{name=${self.attack_name}}} {{Result=${result}}}`;
     }
 }
 
@@ -467,7 +467,7 @@ const getRepeatingSectionCounts = function (charid, prefix) {
 		//ids[matches[1]][matches[2]] = o;
 	});
 	return count;//ids;
-}
+};
 
 function generate_row_id() {
     var out = ['-'];
@@ -518,18 +518,18 @@ const getRepeatingSectionAttrs = function (charid, prefix) {
 		                     .map(a => a[1]))];
 
     const repRowIds = [...new Set(repOrder.filter(x => unorderedIds.includes(x)).concat(unorderedIds))];
-    const wtf_functional_madness = {}
+    const wtf_functional_madness = {};
     for(var o in repeatingAttrs) {
         var match = regExp.exec(o);
 
         if( !(match[1] in wtf_functional_madness) ) {
             wtf_functional_madness[match[1]] = {};
         }
-        wtf_functional_madness[match[1]][match[2]] = repeatingAttrs[o]
+        wtf_functional_madness[match[1]][match[2]] = repeatingAttrs[o];
     }
 
     return [repRowIds, wtf_functional_madness];
-}
+};
 
 function roll_secret_skill(msg) {
     log(msg.selected);
@@ -543,7 +543,7 @@ function roll_secret_skill(msg) {
         var character = getObj('character', obj.get('represents'));
         characters.push(character);
     }
-    let matches=RegExp("{{skill=([^}]*)}}","g").exec(msg.content)
+    let matches=RegExp("{{skill=([^}]*)}}","g").exec(msg.content);
     let skill = matches[1];
     let skill_upper = skill.toUpperCase();
     if( skill == 'Lore' ) {
@@ -568,13 +568,13 @@ function roll_secret_skill(msg) {
 
             for(var j in IDs) {
                 let attrs = attributes[IDs[j]];
-                let lore_name = attrs['lore_name'];
-                log('peep');
+                let lore_name = attrs.lore_name;
+
                 if(lore_name) {
                     lore_name = lore_name.get('current');
                 }
                 if(lore_name && lore_name.toLowerCase().trim() == skill.toLowerCase().trim()) {
-                    bonus = attrs['lore'];
+                    bonus = attrs.lore;
 
                     if( bonus ) {
                         bonus = bonus.get('current');
@@ -612,7 +612,7 @@ function roll_secret_skill(msg) {
                           2 : 'Trained',
                           4 : 'Expert',
                           6 : 'Master',
-                          8 : 'Legendary' }
+                          8 : 'Legendary' };
             rank = ranks[rank];
             if( !rank ) {
                 rank = 'Untrained';
@@ -654,14 +654,14 @@ function parse_expressions(damage_string) {
     // {normal : 2d6+10,
     //  extra  : [[1d6]] fire and [[2d6]] evil}
     //
-    let expressions = []
-    let dice_positions = []
+    let expressions = [];
+    let dice_positions = [];
     let pos = 0;
     let num_trials = 0;
     while(pos < damage_string.length) {
         let re = RegExp('(\\d+d\\d+)','ig');
         let match = re.exec(damage_string);
-        let expr = []
+        let expr = [];
         let last = 0;
 
         while(1) {
@@ -669,13 +669,13 @@ function parse_expressions(damage_string) {
 
             if(match == null || last != match.index) {
                 //we've got some inbetween to look at. If this has got anything other than +-numbers with possible whitespace then we're done
-                var end = undefined
+                var end = undefined;
                 if( match ) {
-             	    end = match.index
+             	    end = match.index;
                 }
                 let between = damage_string.substring(last, end);
-                let between_re = RegExp('(^[+-\\d\\s]+)','g')
-                let between_match = between_re.exec(between)
+                let between_re = RegExp('(^[+-\\d\\s]+)','g');
+                let between_match = between_re.exec(between);
                 if( null == between_match ) {
                     expressions.push(between);
                     last = end;
@@ -713,7 +713,7 @@ function parse_expressions(damage_string) {
 
     return {parts : expressions,
             dice  : dice_positions,
-           }
+           };
 }
 
 function parse_damage(damage_string) {
@@ -740,8 +740,8 @@ function parse_damage(damage_string) {
     //type and we shift that to the additional field
     type_parts = type.split(' ');
     let type_end = 0;
-    for(var i = 0; i < type_parts.length; i++) {
-        let part_lower = type_parts[i].toLowerCase()
+    for(i = 0; i < type_parts.length; i++) {
+        let part_lower = type_parts[i].toLowerCase();
     	if( part_lower == 'plus') {
       	    //we're always done;
             break;
@@ -770,7 +770,7 @@ function turn_off_marker_character(id, marker_name) {
             continue;
         }
         var on = status.split(',');
-        var new_on = []
+        var new_on = [];
         for(var item of on) {
             if( item.indexOf(marker_name) == -1 ) {
                 new_on.push(item);
@@ -793,7 +793,7 @@ function turn_off_marker_token(id, marker_name) {
             return;
         }
         var on = status.split(',');
-        var new_on = []
+        var new_on = [];
         for(var item of on) {
             if( item.indexOf(marker_name) == -1 ) {
                 new_on.push(item);
@@ -837,7 +837,6 @@ function parse_json_character(character, data) {
                       'size'      : 'size',
                       'type'      : 'npc_type',
                       'languages' : 'languages',
-                      'alignment' : 'alignment',
                      };
 
     let set_int = {'level'       : 'level',
@@ -896,7 +895,7 @@ function parse_json_character(character, data) {
                      'thievery'     : 'thievery_notes',
                      'ac'           : 'armor_class_notes',
                      'hp'           : 'hit_points_notes',
-                    }
+                    };
 
     var spells      = false;
     var cantrips    = false;
@@ -911,10 +910,10 @@ function parse_json_character(character, data) {
     for( var key of Object.keys(set_value) ) {
         set_attribute(character.id, set_value[key], '');
     }
-    for( var key of Object.keys(set_int) ) {
+    for( key of Object.keys(set_int) ) {
         set_attribute(character.id, set_int[key], '');
     }
-    for( var key of Object.keys(set_notes) ) {
+    for( key of Object.keys(set_notes) ) {
         set_attribute(character.id, set_notes[key], '');
     }
 
@@ -938,7 +937,7 @@ function parse_json_character(character, data) {
     set_attribute(character.id, 'whispertype','/w gm ');
     set_attribute(character.id, 'roll_show_notes','[[1]]');
 
-    for( var key of Object.keys(data) ) {
+    for( key of Object.keys(data) ) {
         log(key);
         if( key == 'name' ) {
             //This one isn't an attribute, it's special
@@ -969,9 +968,9 @@ function parse_json_character(character, data) {
         }
         else if( key == 'perception' ) {
             //This one is a bit odd as it has a notes field that sets senses
-            set_attribute(character.id, 'perception', data[key]['value']);
-            if( data[key]['note'] ) {
-                set_attribute(character.id, 'senses', data[key]['note']);
+            set_attribute(character.id, 'perception', data[key].value);
+            if( data[key].note ) {
+                set_attribute(character.id, 'senses', data[key].note);
             }
         }
         else if( key in set_string ) {
@@ -980,12 +979,12 @@ function parse_json_character(character, data) {
         else if( key in set_int ) {
             set_attribute(character.id, set_int[key], data[key]);
         }
-        else if( key in set_value && data[key]['value'] ) {
-            set_attribute(character.id, set_value[key], data[key]['value']);
+        else if( key in set_value && data[key].value ) {
+            set_attribute(character.id, set_value[key], data[key].value);
         }
 
-        if( key in set_notes && data[key]['note'] ) {
-            set_attribute(character.id, set_notes[key], data[key]['note']);
+        if( key in set_notes && data[key].note ) {
+            set_attribute(character.id, set_notes[key], data[key].note);
         }
 
         else if( key == 'strikes' ) {
@@ -996,34 +995,34 @@ function parse_json_character(character, data) {
                 let id = generate_row_id();
                 let prefix = '';
 
-                if( strike['type'] == 'Melee' ) {
+                if( strike.type == 'Melee' ) {
                     prefix = 'repeating_melee-strikes';
                 }
-                else if( strike['type'] == 'Ranged' ) {
+                else if( strike.type == 'Ranged' ) {
                     prefix = 'repeating_ranged-strikes';
                 }
                 else {
                     continue;
                 }
-                let stub = `${prefix}_${id}_`
-                let damage = parse_damage(strike['damage']);
+                let stub = `${prefix}_${id}_`;
+                let damage = parse_damage(strike.damage);
                 if( null == damage ) {
                     continue;
                 }
 
-                set_attribute(character.id, stub + 'weapon', strike['name']);
-                set_attribute(character.id, stub + 'weapon_strike', strike['attack']);
-                set_attribute(character.id, stub + 'weapon_traits', strike['traits']);
+                set_attribute(character.id, stub + 'weapon', strike.name);
+                set_attribute(character.id, stub + 'weapon_strike', strike.attack);
+                set_attribute(character.id, stub + 'weapon_traits', strike.traits);
                 set_attribute(character.id, stub + 'weapon_strike_damage', damage.damage);
                 set_attribute(character.id, stub + 'weapon_strike_damage_type', damage.type);
                 set_attribute(character.id, stub + 'weapon_strike_damage_additional', damage.additional);
-                if( strike['notes'] ) {
-                    set_attribute(character.id, stub + 'weapon_notes', strike['notes']);
+                if( strike.notes ) {
+                    set_attribute(character.id, stub + 'weapon_notes', strike.notes);
                 }
                 set_attribute(character.id, stub + 'toggles', 'display,');
                 reporder[prefix].push(id);
             }
-            for( var key of Object.keys(reporder) ) {
+            for( key of Object.keys(reporder) ) {
                 set_attribute(character.id, '_reporder_' + key, reporder[key].join(','));
             }
         }
@@ -1036,19 +1035,19 @@ function parse_json_character(character, data) {
             for(var special of data[key]) {
                 let id = generate_row_id();
 
-                let action = special['actions'];
+                let action = special.actions;
                 let prefix = '';
-                if( special['type'] == 'general' ) {
+                if( special.type == 'general' ) {
                     prefix = 'repeating_interaction-abilities';
                 }
-                else if( special['type'] == 'defense' ) {
-                    prefix = 'repeating_free-actions-reactions'
+                else if( special.type == 'defense' ) {
+                    prefix = 'repeating_free-actions-reactions';
                 }
-                else if( special['type'] == 'offense' ) {
-                    prefix = 'repeating_actions-activities'
+                else if( special.type == 'offense' ) {
+                    prefix = 'repeating_actions-activities';
                 }
                 else {
-                    log("Unknown ability type: " + special['type']);
+                    log("Unknown ability type: " + special.type);
                     continue;
                 }
                 let stub = `${prefix}_${id}_`;
@@ -1077,31 +1076,32 @@ function parse_json_character(character, data) {
                     continue;
                 }
 
-                let description = special['description'];
-                if( special['name'].toLowerCase() == 'attack of opportunity' && description == '' ) {
+                let description = special.description;
+                if( special.name.toLowerCase() == 'attack of opportunity' && description == '' ) {
                     description = 'You lash out at a foe that leaves an opening. Make a melee Strike against the triggering creature. If your attack is a critical hit and the trigger was a manipulate action, you disrupt that action. This Strike doesn’t count toward your multiple attack penalty, and your multiple attack penalty doesn’t apply to this Strike. ';
                 }
-                description.replace('&nbsp;','\n')
-                set_attribute(character.id, stub + 'name', special['name']);
+                description.replace('&nbsp;','\n');
+                set_attribute(character.id, stub + 'name', special.name);
 
-                set_attribute(character.id, stub + 'rep_traits', special['traits']);
+                set_attribute(character.id, stub + 'rep_traits', special.traits);
                 set_attribute(character.id, stub + 'description', description);
                 set_attribute(character.id, stub + 'toggles', 'display,');
                 reporder[prefix].push(id);
             }
-            for( var key of Object.keys(reporder) ) {
+            for( key of Object.keys(reporder) ) {
                 set_attribute(character.id, '_reporder_' + key, reporder[key].join(','));
             }
         }
         else if( key == 'spells' || key == 'morespells' ) {
             //We've got some spells. Firsty we need to turn on the spellcaster options.
+            let spell_data = [];
+            let spell_type_key = 'spelltype';
             if( key == 'spells' ) {
-                var spell_data = [data];
-                var spell_type_key = 'spelltype';
+                spell_data = [data];
             }
             else {
-                var spell_data = data['morespells'];
-                var spell_type_key = 'name';
+                spell_data = data.morespells;
+                spell_type_key = 'name';
                 // The input can have a different DC and attack roll here, but the roll20 sheet doesn't
                 // support it so we ignore it
             }
@@ -1251,7 +1251,7 @@ function parse_json_character(character, data) {
             let id = generate_row_id();
             let stub = 'repeating_lore';
             set_attribute(character.id, stub + `_${id}_` + 'lore_name', data[key]['name']);
-            set_attribute(character.id, stub + `_${id}_` + 'lore', data[key]['value']);
+            set_attribute(character.id, stub + `_${id}_` + 'lore', data[key].value);
             if( data[key]['note'] ) {
                 set_attribute(character.id, stub + `_${id}_` + 'lore_notes', data[key]['note']);
             }
@@ -2105,7 +2105,7 @@ function load_pdf_data(input) {
                 match = multi_matchers[i].re.exec(line);
                 if( match ) {
                     log('mutlimatch ' + multi_matchers[i].name);
-                    if( matchers[i].name == 'affliction' || matchers[i].name == 'action' ) {
+                    if( multi_matchers[i].name == 'affliction' || multi_matchers[i].name == 'action' ) {
                         first_ability = false;
                     }
                     break;
@@ -2586,7 +2586,7 @@ function add_sweep(attack) {
         new_attack += '+';
     }
     //TODO: I'd like to be able to mark this as "[Sweep]" so it's possible to inspect it in the roll20 chat, but doing so messes up the macro somehow
-    new_attack += `?{First Target Attacked?|Yes,0|No,1}[Sweep]`;
+    new_attack += `( +?{First Target Attacked?|Yes,0|No,1}[Sweep] )`;
     return new_attack;
 }
 
