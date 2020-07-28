@@ -32,12 +32,31 @@ With luck you'll see the message "Character Flytrap Leshy parsed successfully us
 
 It will also have set the first token bar to the hit points, and the second to the focus points for the creature, if they have them.
 
+You can also use the json output from monster.pf2.tools in the same way.
+
 Rolling Assistants
 ------------------
 A number of macros should have been set up automatically as token actions. When you click on your new creature you should see them pop up by the select tool. Try clicking them! Note that by default rolls are whispered to the GM, parsed, then summarized to the players with the modifiers removed (and using the name we gave the enemy earlier). This is both to allow the GM to keep information like modifiers hidden, but also to facilitate rewriting of critical damage. For example, lets see what happens when we roll an attack for our leshy:
 
-<img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_attack_normal.jpg" width="330" height="240" class="center">
+<img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_attack_normal.jpg" width="150" height="350" class="center">
 
 The critical damage is exactly twice the regular damage, huzzah! We can also see that it handles deadly and fatal correctly, based on the contents of the traits field for the corresponding weapon. If I edit that field to add fatal and deadly we can see what happens:
 
-<img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_attack_fatal.jpg" width="120" height="280" class="center"> <img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_attack_deadly.jpg" width="120" height="280" class="center">
+<img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_attack_fatal.jpg" width="150" height="350" class="center"> <img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_attack_deadly.jpg" width="150" height="350" class="center">
+
+You can turn off this roll hiding using the !pf2-config macro, but you'll need to reparse the creature for it to take effect
+
+Secret Rolls
+------------
+
+There are two macros that are by default shared with all players to facilitate making secret checks. The first is the "secret" macro. It asks for a bonus, then makes a roll that only the GM can see. If the GM clicks it, then there is no indication given to the players, whereas if a player clicks it it announces that they are making a roll so that can see that it has had an effect.
+
+The secret-skills macro is analogous but more powerful. It allows clicking on a token, or selecting a group of tokens, then choosing a skill (or perception) to roll for them all secretly, which are then presented to the GM in a table, along with the relevant proficiencies. For example:
+
+<img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/secret_skills.jpg" width="150" height="350" class="center"> <img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_attack_deadly.jpg" width="200" height="200" class="center">
+
+Again, if a player uses it, it announces in the chat that a roll has been made so the player gets some feedback.
+
+Bugs
+----
+Please send bug reports to tom.pudding@gmail.com

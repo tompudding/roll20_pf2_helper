@@ -2729,7 +2729,7 @@ function show_secret_skills_buttons(msg) {
     var message = [`/w ${msg.who} &{template:rolls} {{header=Secret Skills}} {{desc=`]
 
     for(var skill of skill_names) {
-        message.push(`[${skill}](!secret-skill {{skill=${skill}&#125;})`);
+        message.push(`[${skill}](!pf2-secret-skill {{skill=${skill}&#125;})`);
     }
 
     let all_lores = new Set();
@@ -2754,7 +2754,7 @@ function show_secret_skills_buttons(msg) {
         }
     }
     for( var lore_name of all_lores ) {
-        message.push(`[${lore_name}](!secret-skill {{skill=${lore_name}&#125;})`);
+        message.push(`[${lore_name}](!pf2-secret-skill {{skill=${lore_name}&#125;})`);
     }
     message.push('}}')
 
