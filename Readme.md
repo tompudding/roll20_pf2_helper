@@ -1,9 +1,10 @@
 PF2 Helper
 ==========
 
-This is an Roll20 API script designed to help running Pathfinder Second Edition. It has three main features:
+This is an Roll20 API script designed to help running Pathfinder Second Edition. It has four main features:
 
 * Parsing of NPCs/Monsters from Paizo PDFs and monster.pf2.tools json
+* Quick macros for rolling saves / skills and attacks of enemies.
 * Hiding of enemy rolls, names, and more correct handling of criticals (including deadly and fatal)
 * Making secret rolls easier
 
@@ -27,6 +28,16 @@ It will pop up and ask you for the name your players will see. That's because wh
 
 With luck you'll see the message "Character Flytrap Leshy parsed successfully using PDF format" whispered to you in the chat, and the character should have been filled in as much as possible:
 
-<img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_parsed.jpg" width="270" height="228" class="center">
+<img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_parsed.jpg" width="330" height="240" class="center">
 
 It will also have set the first token bar to the hit points, and the second to the focus points for the creature, if they have them.
+
+Rolling Assistants
+------------------
+A number of macros should have been set up automatically as token actions. When you click on your new creature you should see them pop up by the select tool. Try clicking them! Note that by default rolls are whispered to the GM, parsed, then summarized to the players with the modifiers removed (and using the name we gave the enemy earlier). This is both to allow the GM to keep information like modifiers hidden, but also to facilitate rewriting of critical damage. For example, lets see what happens when we roll an attack for our leshy:
+
+<img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_attack_normal.jpg" width="330" height="240" class="center">
+
+The critical damage is exactly twice the regular damage, huzzah! We can also see that it handles deadly and fatal correctly, based on the contents of the traits field for the corresponding weapon. If I edit that field to add fatal and deadly we can see what happens:
+
+<img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_attack_fatal.jpg" width="330" height="240" class="center"> <img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_attack_deadly.jpg" width="330" height="240" class="center">
