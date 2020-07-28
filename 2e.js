@@ -1554,6 +1554,22 @@ function load_pdf_data(input) {
     //The GMG uses unicode instead of symbols
     input = input.replace(/\ue904/ug,'[reaction]');
     input = input.replace(/\ue902/ug,'[one-action]');
+
+
+    // The main challenge of this function is deciding which line breaks are there intentionally (as they
+    // start a new ability), and which are just for word wrapping. There are a lot of heuristics and edge
+    // cases that go into it, so the last thing we want to do is throw in more line breaks, but there is one
+    // issue we need to handle. Specifically, some of the essential blocks (AC, HP and Ability scores) don't
+    // always start a line, for example the shield archon omits the line break before the ability scores for
+    // some reason. We need to put them back in if they're not there.
+    let essential_re = [/[^>]Str ([+-]?\s?\d+).*Dex ([+-]?\s?\d+).*Con ([+-]?\s?\d+).*Int ([+-]?\s?\d+).*Wis ([+-]?\s?\d+).*Cha ([+-]?\s?\d+).*/g];
+    for(var re of essential_re) {
+        let match = re.exec(input);
+        if( match ) {
+            //Note that this will only match if the string isn't preceded by a newline, as . won't match the newline character
+            input = input.slice(0, match.index + 1) + '</p>' + input.slice(match.index + 1);
+        }
+    }
     lines = input.split(/<\/p>|<br>/ig);
 
     //The name should be the first line
