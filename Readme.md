@@ -37,8 +37,9 @@ You can also use the json output from monster.pf2.tools in the same way.
 Rolling Assistants
 ------------------
 A number of macros should have been set up automatically as token actions. When you click on your new creature you should see them pop up by the select tool. Try clicking them! Note that by default rolls are whispered to the GM, parsed, then summarized to the players with the modifiers removed (and using the name we gave the enemy earlier). This is both to allow the GM to keep information like modifiers hidden, but also to facilitate rewriting of critical damage. For example, lets see what happens when we roll an attack for our leshy:
-
+<p align="center">
 <img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_attack_normal.jpg" width="150" height="350" class="center">
+</p>
 
 The critical damage is exactly twice the regular damage, huzzah! We can also see that it handles deadly and fatal correctly, based on the contents of the traits field for the corresponding weapon. If I edit that field to add fatal and deadly we can see what happens:
 
