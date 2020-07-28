@@ -53,7 +53,7 @@ There are two macros that are by default shared with all players to facilitate m
 
 The secret-skills macro is analogous but more powerful. It allows clicking on a token, or selecting a group of tokens, then choosing a skill (or perception) to roll for them all secretly, which are then presented to the GM in a table, along with the relevant proficiencies. For example:
 
-<img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/secret_skills.jpg" width="150" height="350" class="center"> <img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_attack_deadly.jpg" width="200" height="200" class="center">
+<img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/secret_skills.jpg" width="300" height="300" class="center">
 
 Again, if a player uses it, it announces in the chat that a roll has been made so the player gets some feedback.
 
