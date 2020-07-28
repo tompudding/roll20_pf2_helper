@@ -732,6 +732,9 @@ function link_token_bars(character) {
 }
 
 function play(title) {
+    if( !state.pf2_helper.sounds ) {
+        return;
+    }
     var track = findObjs({type:'jukeboxtrack', title:title})[0];
     if( track ) {
         track.set({playing:true, softstop:false, loop:false});
@@ -2264,14 +2267,19 @@ function show_config_options(msg) {
         case 'toggle_other_popups':
             state.pf2_helper.use_other_popups = !state.pf2_helper.use_other_popups;
             break;
+        case 'toggle_sounds':
+            state.pf2_helper.sounds = !state.pf2_helper.sounds;
+            extra_message = '';
+            break;
         default:
-            extra_message = ''
+            extra_message = '';
         }
     }
 
     message.push(`{{Default NPC hide rolls=[${state.pf2_helper.hide_rolls}](!pf2-config toggle_hide)}}`)
     message.push(`{{Use MAP popups=[${state.pf2_helper.use_map_popups}](!pf2-config toggle_popups)}}`)
     message.push(`{{Use Sweep/other popups=[${state.pf2_helper.use_other_popups}](!pf2-config toggle_other_popups)}}`)
+    message.push(`{{Use sounds=[${state.pf2_helper.sounds}](!pf2-config toggle_sounds)}}`)
     message.push(extra_message);
 
     sendChat(module_name, message.join(' '));
@@ -2874,6 +2882,7 @@ on("ready", function() {
             hide_rolls : true,
             use_map_popups : true,
             use_other_popups : true,
+            sounds : true,
         };
     }
 
