@@ -24,10 +24,9 @@ Bugs:
 **done** First parse on a new character has the spell type toggles flipped
 **done** 2nd and subsequent parses can mess up attack order
          We sometimes have core rulebook references left in the spell name
-         Gamemastery Guide has unicode instead of action symbols which breaks things
+**done** Gamemastery Guide has unicode instead of action symbols which breaks things
 **done** Dero Stalker has some spell problems
 **done** comma separated lists inside brackets in spells mess us up (e.g on the Balisse)
 
 
 problem monsters:
-GIANT ANIMATED STATUE (we split up the ability description at "Burn Alive")

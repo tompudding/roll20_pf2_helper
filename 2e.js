@@ -1892,6 +1892,9 @@ function load_pdf_data(input) {
               //let numerals = ['10th', '9th', '8th', '7th', '6th', '5th', '4th', '3rd', '2nd', '1st'];
               let numerals = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
               let spells = [];
+              for( var j = 0; j < 11; j++ ) {
+                  spells.push([]);
+              }
 
               //Do we have focus points?
               let focus_points = ''
@@ -1902,11 +1905,45 @@ function load_pdf_data(input) {
                   spell_data = spell_data.slice(0, focus_match.index) + spell_data.slice(focus_re.lastIndex);
               }
 
-              //We look for cantrips first because we don't want to accidentally pick them up as spells if the creature doesn't have spells of the same level
+              //We start with constant as it should be at the end and we can cut it off after parsing it
+              let constant_re = /Constant \((.*)/g
+              let constant = constant_re.exec(spell_data);
+              if( constant && constant[1] ) {
+                  //We can have multiple constant spells at different levels, which looks like this:
+                  //  Constant (5th) tongues; (4th) speak with plants; (2nd) speak with animals
+                  // I expect we'll see some without semicolons at some point
+                  let constant_levels = constant[1].split(/\(/g);
+                  for( var level_data of constant_levels ) {
+                      let constant_level_match = /(\d+)(?:st|nd|rd|th)\s*\)(.*)/g.exec(level_data);
+
+                      if( !constant_level_match || !constant_level_match[1] || !constant_level_match[2] ) {
+                          continue;
+                      }
+                      let level = constant_level_match[1];
+                      let constant_spells = constant_level_match[2].trim();
+                      if( constant_spells.indexOf(';') != -1 ) {
+                          constant_spells = constant_spells.slice(0, constant_spells.indexOf(';'));
+                      }
+                      for( var spell of constant_spells.split(',') ) {
+                          spell = spell.trim();
+                          //Roll20 doesn't really have a good way to list constant spells that I'm aware of,
+                          //just just put it in as a spell with (constant) after it
+                          spells[level].push(spell + ' (constant)');
+                      }
+                      log(`Constant level ${level} ${constant_spells}`);
+                  }
+                  spell_data = spell_data.slice(0, constant.index);
+              }
+
+              // We look for cantrips next because we don't want to accidentally pick them up as spells if the
+              // creature doesn't have spells of the same level. I think it's conceivable a creature would
+              // have multiple cantrips at different levels, but I don't know of any so let's not worry about
+              // them for now
+
               let cantrip_re = /Cantrips \((\d+)(st|nd|rd|th)\s*\)(.*)/g
               let cantrips = cantrip_re.exec(spell_data);
               let cantrip_level = '';
-              log(cantrips);
+
               if( cantrips && cantrips[1] ) {
                   cantrip_level = cantrips[1].trim();
               }
@@ -1918,8 +1955,9 @@ function load_pdf_data(input) {
                   if( cantrip_str.indexOf(';') != -1 ) {
                       cantrip_str = cantrip_str.slice(0, cantrip_str.indexOf(';'));
                   }
-                  spells.push(cantrip_str.trim());
+                  spells[0].push(cantrip_str.trim());
               }
+
               for(var i = 0; i < numerals.length; i++) {
                   let spell_level = '';
                   let index = spell_data.indexOf(numerals[i])
@@ -1930,9 +1968,12 @@ function load_pdf_data(input) {
                       }
                       spell_data = spell_data.slice(0, index);
                   }
-                  spells.push(spell_level.trim());
+                  spells[i+1].push(spell_level.trim());
               }
-              //TODO: Constant spells?
+
+              for(var i = 0; i < spells.length; i++) {
+                  spells[i] = spells[i].join(',');
+              }
 
 
               let target = output;
@@ -2074,7 +2115,7 @@ function load_pdf_data(input) {
                 //we can also rule out this ability if it's got any of a short list of bad words in it
                 let bad_words = ['GM'];
                 //Or if it's exactly equal to something no ability would be called
-                let bad_titles = ['damage','stage','hit','constant','effect','requirement','the'];
+                let bad_titles = ['damage','stage','hit','constant','effect','requirement','the','any'];
                 let bad_chars = ['+','-','.'];
                 let test_words = words.slice(0, num_title);
                 let putative_title = test_words.join(" ").trim();
