@@ -31,7 +31,7 @@ With luck you'll see the message "Character Flytrap Leshy parsed successfully us
 <p align="center">
 <img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_parsed.jpg" width="330" height="240" class="center">
 </p>
-It will also have set the first token bar to the hit points, and the second to the focus points for the creature, if they have them.
+It will also have set the first token bar to the hit points, and the second to the focus points for the creature, if they have them. Note that because the compendium is not available from the API the spells are created but have no information filled in alas.
 
 You can also use the json output from monster.pf2.tools in the same way.
 

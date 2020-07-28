@@ -1,4 +1,5 @@
 var module_name = 'PF2 Helper';
+var module_version = 'v1.0';
 
 function get_index(msg) {
     var roll_match = RegExp("\\$\\[\\[(\\d+)\\]\\]");
@@ -2248,7 +2249,7 @@ function get_and_parse_character(msg) {
 
 function show_config_options(msg) {
     let command = /!pf2-config (.*)/.exec(msg.content);
-    let message = [`/w ${msg.who} &{template:default} {{name=${module_name} Config}}`];
+    let message = [`/w ${msg.who} &{template:default} {{name=${module_name} ${module_version} Config}}`];
     let extra_message = '';
 
     if( command && command[1] ) {
