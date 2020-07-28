@@ -40,4 +40,4 @@ A number of macros should have been set up automatically as token actions. When 
 
 The critical damage is exactly twice the regular damage, huzzah! We can also see that it handles deadly and fatal correctly, based on the contents of the traits field for the corresponding weapon. If I edit that field to add fatal and deadly we can see what happens:
 
-<img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_attack_fatal.jpg" width="330" height="240" class="center"> <img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_attack_deadly.jpg" width="330" height="240" class="center">
+<img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_attack_fatal.jpg" width="120" height="280" class="center"> <img src="https://raw.githubusercontent.com/tompudding/roll20_pf2_helper/master/readme_images/leshy_attack_deadly.jpg" width="120" height="280" class="center">
