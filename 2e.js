@@ -10,23 +10,6 @@ function get_index(msg) {
     return parseInt(index[1], 10);
 }
 
-function get_index_extra(msg) {
-    var roll_match = RegExp("\\$\\[\\[(\\d+)\\]\\](.*)");
-
-    var index = roll_match.exec(msg);
-    if( null == index ) {
-        return null;
-    }
-    return index[2];
-}
-
-function is_threat(roll) {
-    if( roll.mods.customCrit[0].comp != '>=' ) {
-        return roll.results[0].v == 20;
-    }
-    return roll.results[0].v >= roll.mods.customCrit[0].point;
-}
-
 function set_attribute(id, attr_name, value) {
     var attrs = findObjs({type : 'attribute', characterid:id, name:attr_name});
     for (var ob of attrs) {
@@ -36,7 +19,7 @@ function set_attribute(id, attr_name, value) {
 }
 
 function get_attribute(id, attr_name) {
-    objs = findObjs({type : 'attribute', characterid:id, name:attr_name});
+    let objs = findObjs({type : 'attribute', characterid:id, name:attr_name});
     if( objs.length == 0 ) {
         log('no attribute darn');
         return undefined;
@@ -54,13 +37,6 @@ function parse_roll(to_hit, die_result, threat) {
     else {
         return `[[${to_hit}]]`;
     }
-}
-
-function clean_carrots(input) {
-    if(input.startsWith('^{')) {
-        return input + '}';
-    }
-    return input;
 }
 
 function title_case(text) {
@@ -284,7 +260,6 @@ class AttackRoll extends Roll {
             var old_dice = RegExp("(\\d+)d(\\d+)","g").exec(rolls.damage.roll.expression);
             if( old_dice.length > 2 ) {
                 var num_old = parseInt(old_dice[1]);
-                var type_old = old_dice[2];
 
                 var new_dice = `${num_old}${match[1]}`;
                 fatal = rolls.damage.roll.expression.replace(old_dice[0],new_dice);
@@ -376,7 +351,6 @@ class BasicRoll extends Roll{
     }
 
     format() {
-        var self = this;
         return `&{template:rolls} {{header=${this.name} ${this.header}}} {{subheader=${this.subheader}}}` +
             `{{roll01=${this.result}}} {{roll01_type=${this.type}} {{notes_show=0}}`;
     }
@@ -402,72 +376,6 @@ class Skill extends BasicRoll{
         this.type = 'skill';
     }
 }
-
-class GenericAttack extends Roll{
-    constructor(content, rolls) {
-        super(content, rolls);
-        var self = this;
-        var s = '{{name=\\^{(.*)}}}.*{{check=([^}]*)}}';
-        var matcher = RegExp(s,"g");
-        var array1 = matcher.exec(content);
-        //can I put this in the class and not instantiate it every time?
-        var name_lookup = {
-            "ranged-attack" : "Ranged Attack",
-            "melee-attack" : "Melee Attack",
-            "combat-maneuver-bonus-abbrv" : "CMB",
-            "melee2-attack" : "Melee Attack",
-            "ranged2-attack" : "Ranged Attack",
-            "combat-maneuver-bonus-abbrv2" : "CMB"
-        };
-
-        if(array1 == null || array1.length < 3) {
-            return;
-        }
-        var index = get_index(array1[2]);
-        if( null == index ) {
-            log("No save index");
-            return;
-        }
-        var roll = rolls[index];
-        self.die_result = roll.results.rolls[0].results[0].v;
-        self.attack_total = roll.results.total;
-        self.attack_name = name_lookup[array1[1]];
-        if(undefined == self.attack_name) {
-            self.attack_name = array1[1];
-        }
-    }
-
-    format() {
-        var self = this;
-        var result = parse_roll(self.attack_total, self.die_result, false);
-        return `&{template:pf_ability} {{name=${self.attack_name}}} {{Result=${result}}}`;
-    }
-}
-
-const getRepeatingSectionCounts = function (charid, prefix) {
-	let repeatingAttrs = {};
-	let regExp = new RegExp(`^${prefix}_(-[-A-Za-z0-9]+?|\\d+)_(.*)`);
-	let repOrder;
-	let ids = {};
-	let count = 0;
-	// Get attributes
-	findObjs({
-		_type: 'attribute',
-		_characterid: charid
-	}).forEach(o => {
-	    const attrName = o.get('name');
-	    var matches = regExp.exec(attrName);
-	    if( null == matches ) {
-		return;
-	    }
-	    if(!(matches[1] in ids)) {
-		ids[matches[1]] = {};
-		count += 1;
-	    }
-		//ids[matches[1]][matches[2]] = o;
-	});
-	return count;//ids;
-};
 
 function generate_row_id() {
     var out = ['-'];
@@ -520,6 +428,9 @@ const getRepeatingSectionAttrs = function (charid, prefix) {
     const repRowIds = [...new Set(repOrder.filter(x => unorderedIds.includes(x)).concat(unorderedIds))];
     const wtf_functional_madness = {};
     for(var o in repeatingAttrs) {
+        if( !o ) {
+            continue;
+        }
         var match = regExp.exec(o);
 
         if( !(match[1] in wtf_functional_madness) ) {
@@ -546,16 +457,13 @@ function roll_secret_skill(msg) {
     let matches=RegExp("{{skill=([^}]*)}}","g").exec(msg.content);
     let skill = matches[1];
     let skill_upper = skill.toUpperCase();
-    if( skill == 'Lore' ) {
-        return show_secret_lore_buttons(id, msg);
-    }
 
     // We'll do the output differently depending on if we have just one or not. For a single roll we'll do the
     // normal macro
     if( false == playerIsGM(msg.playerid) ) {
         sendChat(msg.who, `/me rolls a secret ${skill} check...`);
     }
-    message = [`/w GM &{template:rolls} {{header=Secret ${skill}}}`];
+    let message = [`/w GM &{template:rolls} {{header=Secret ${skill}}}`];
     for( var i = 0; i < characters.length; i++) {
         let bonus = 0;
         let is_lore = false;
@@ -567,6 +475,9 @@ function roll_secret_skill(msg) {
             const [IDs, attributes] = getRepeatingSectionAttrs(characters[i].id,'repeating_lore');
 
             for(var j in IDs) {
+                if( !j ) {
+                    continue;
+                }
                 let attrs = attributes[IDs[j]];
                 let lore_name = attrs.lore_name;
 
@@ -641,7 +552,6 @@ function roll_secret(msg) {
         sendChat(module_name, `/w ${msg.who} Invalid input ${bonus_str}`);
         return;
     }
-    var who = msg.who;
     if( false == playerIsGM(msg.playerid) ) {
         sendChat(msg.who, `/me rolls a secret check with bonus ${bonus}...`);
     }
@@ -717,7 +627,7 @@ function parse_expressions(damage_string) {
 }
 
 function parse_damage(damage_string) {
-    data = parse_expressions(damage_string);
+    let data = parse_expressions(damage_string);
     //Damage is easy, it's the first dice expression
     let damage = data.parts[data.dice[0]];
     let type = 'unknown';
@@ -738,7 +648,7 @@ function parse_damage(damage_string) {
     //As a final check, we might have left the word 'plus' or 'with' or something attached to our damage
     //type. We go through that and allow 'and' and commas to be in it, but anything else is the end of the
     //type and we shift that to the additional field
-    type_parts = type.split(' ');
+    let type_parts = type.split(' ');
     let type_end = 0;
     for(i = 0; i < type_parts.length; i++) {
         let part_lower = type_parts[i].toLowerCase();
@@ -1112,11 +1022,11 @@ function parse_json_character(character, data) {
                     spell_type = spell_type.toLowerCase();
                 }
 
-                var this_focus = spell_datum['focuspoints'] != undefined && spell_datum['focuspoints'] != '';
+                var this_focus = spell_datum.focuspoints != undefined && spell_datum.focuspoints != '';
 
                 if( this_focus ) {
                     //We need to set the number of focus points too
-                    set_attribute(character.id, 'focus_points', parseInt(spell_datum['focuspoints']));
+                    set_attribute(character.id, 'focus_points', parseInt(spell_datum.focuspoints));
                 }
 
                 var stub = `repeating_normalspells`;
@@ -1140,7 +1050,7 @@ function parse_json_character(character, data) {
                 }
 
                 for(var i = 0; i < 11; i++) {
-                    if( spell_datum['spells'][i] ) {
+                    if( spell_datum.spells[i] ) {
                         spells = true;
 
                         //We're throwing some spells in!
@@ -1149,7 +1059,7 @@ function parse_json_character(character, data) {
                         if( level == 0 ) {
                             //cantrips
                             this_stub = `repeating_cantrip`;
-                            level = spell_datum['cantriplevel']
+                            level = spell_datum.cantriplevel;
                             //oddly the cantrip level field is called "cantrips_per_day"
                             set_attribute(character.id, 'cantrips_per_day', level);
                             cantrips = true;
@@ -1160,9 +1070,9 @@ function parse_json_character(character, data) {
                         }
 
                         //If they're a spontaneous caster we expect it to tell us how many slots
-                        let spell_info = spell_datum['spells'][i];
+                        let spell_info = spell_datum.spells[i];
                         let slot_info_re = /^\s*\((\d+) slots\)/i;
-                        slot_info = slot_info_re.exec(spell_info);
+                        let slot_info = slot_info_re.exec(spell_info);
                         if( slot_info ) {
                             spontaneous = true;
                             spell_info = spell_info.slice(slot_info_re.lastIndex);
@@ -1178,7 +1088,6 @@ function parse_json_character(character, data) {
                         //Rather than split on commas, we need to be a bit more careful, because of something
                         //  like this on the balisse:
                         // 2nd invisibility (at will, self only)
-                        let pos = 0;
                         let spell_names = [];
 
                         while(spell_info) {
@@ -1250,10 +1159,10 @@ function parse_json_character(character, data) {
             //Otherwise it's good and we need a new lore
             let id = generate_row_id();
             let stub = 'repeating_lore';
-            set_attribute(character.id, stub + `_${id}_` + 'lore_name', data[key]['name']);
+            set_attribute(character.id, stub + `_${id}_` + 'lore_name', data[key].name);
             set_attribute(character.id, stub + `_${id}_` + 'lore', data[key].value);
-            if( data[key]['note'] ) {
-                set_attribute(character.id, stub + `_${id}_` + 'lore_notes', data[key]['note']);
+            if( data[key].note ) {
+                set_attribute(character.id, stub + `_${id}_` + 'lore_notes', data[key].note);
             }
             lore_reporder.push(id);
         }
@@ -1263,9 +1172,9 @@ function parse_json_character(character, data) {
             let notes = data[key];
             let saves = ['fortitude','reflex','will'];
             let saves_short = ['Fort','Ref','Will'];
-            for( var i = 0; i < saves.length; i++ ) {
-                if( data[saves[i]] && data[saves[i]]['note'] ) {
-                    notes += `; ${saves_short[i]}: ${data[saves[i]]['note']}`;
+            for( let i = 0; i < saves.length; i++ ) {
+                if( data[saves[i]] && data[saves[i]].note ) {
+                    notes += `; ${saves_short[i]}: ${data[saves[i]].note}`;
                 }
             }
             set_attribute(character.id, 'saving_throws_notes', notes);
@@ -1299,7 +1208,7 @@ function parse_json_character(character, data) {
             set_attribute(character.id, 'spellcaster_spontaneous', 'spontaneous');
         }
     }
-    for( var key of Object.keys(spell_reporder) ) {
+    for( key of Object.keys(spell_reporder) ) {
         set_attribute(character.id, '_reporder_' + key, spell_reporder[key].join(','));
     }
     set_attribute(character.id, '_reporder_repeating_lore', lore_reporder.join(','));
@@ -1329,34 +1238,6 @@ function is_lower_case(str) {
 }
 
 var non_principals = ['a','an','the','in','with','by','of','on','and','or','but','to'];
-
-//Some of those really don't make sense as the last word in a title
-var non_enders = ['a','an','the','with','by','of','and','or','but','to'];
-
-function is_title_case(words) {
-    //Title case is a bit more subtle than just all caps. We need the following:
-    // * The first word is always caps
-    // * Words are only not caps if they are not "principle". The list is long but lets just get the most common
-    if( words.length < 1 ) {
-        return false;
-    }
-
-    if( false == is_upper_case(words[0][0]) ) {
-        return false;
-    }
-
-    for( var word of words ) {
-        if( is_upper_case(word[0]) && (word.length == 1 || is_lower_case(word.slice(1))) ) {
-            continue;
-        }
-
-        if( non_principals.indexOf(word) != -1 ) {
-            continue;
-        }
-        return false;
-    }
-    return true;
-}
 
 function format_ability_description(input, breaks) {
     // In an ability some words should be bolded, and roll20 supports markdown syntax for that, so let's give
@@ -1397,7 +1278,7 @@ function format_ability_description(input, breaks) {
         input = output.join('');
     }
 
-    return input
+    return input;
 }
 
 function num_title_case(words) {
@@ -1413,7 +1294,7 @@ function num_title_case(words) {
 }
 
 //These abilities weirdly start with a lower case latter
-var lower_case_abilities = ['Golem Antimagic']
+var lower_case_abilities = ['Golem Antimagic'];
 
 function num_in_title(words) {
     let n = num_title_case(words);
@@ -1462,7 +1343,7 @@ function new_ability(description_data, ability_type) {
     //the name is in title case
 
 
-    words = description.split(' ');
+    let words = description.split(' ');
     var i = num_in_title(words);
     log(words);
     log(i);
@@ -1494,7 +1375,7 @@ function new_ability(description_data, ability_type) {
 
     description = words.slice(description_start).join(' ');
     let offset = 0;
-    for(var i = 0; i < description_start; i++) {
+    for(i = 0; i < description_start; i++) {
         offset += words[i].length + 1;
     }
 
@@ -1515,7 +1396,7 @@ function new_ability(description_data, ability_type) {
         }
     }
 
-    for(var i = 0; i < description_data.breaks.length; i++) {
+    for(i = 0; i < description_data.breaks.length; i++) {
         description_data.breaks[i] -= offset;
     }
 
@@ -1539,7 +1420,6 @@ function join_ability_lines(lines) {
     if( lines.length < 1 ) {
         return output;
     }
-    let final_lines = []
 
     //First strip whitespace from the start of the first line so we don't mess up our offsets
     lines[0] = lines[0].replace(/^\s+/,"");
@@ -1558,9 +1438,8 @@ function join_ability_lines(lines) {
 }
 
 function load_pdf_data(input) {
-
-    input = input.replace(/&nbsp;/g,' ')
-    input = input.replace(/(<p[^>]+?>|<p>|<div>|<\/div>)/ig, "");
+    input = input.replace(/&nbsp;/g,' ');
+    input = input.replace(/(<p[^>]+?>|<p>|<div>)/ig, "");
     //Paizo sometimes uses weird symbols for minus
     input = input.replace(/–/g,'-');
 
@@ -1583,7 +1462,8 @@ function load_pdf_data(input) {
             input = input.slice(0, match.index + 1) + '</p>' + input.slice(match.index + 1);
         }
     }
-    lines = input.split(/<\/p>|<br>/ig);
+
+    let lines = input.split(/<\/p>|<br>|\n|<\/div>/ig);
 
     //The name should be the first line
     let bracket_index = /\s*\(\s*\d+\s*\)/g.exec(lines[0]);
@@ -1601,7 +1481,7 @@ function load_pdf_data(input) {
     var valid_skills = ['acrobatics', 'arcana', 'athletics', 'crafting', 'deception', 'diplomacy', 'intimidation',
                         'lore', 'medicine', 'nature', 'occultism', 'performance', 'religion', 'society', 'stealth',
                         'survival', 'thievery'];
-    var valid_sizes = ['tiny','small','medium','large','huge','gargantuan']
+    var valid_sizes = ['tiny','small','medium','large','huge','gargantuan'];
     var lore_index = 0;
 
 
@@ -1610,7 +1490,7 @@ function load_pdf_data(input) {
           func : (match) => {
               log('creature feature');
               output.level = parseInt(match[1]);
-              output.traits = match[2].split(/[ ,]+/).join(", ");
+              output.traits = match[2].split(/[ ,]+/);
               return true;
           },
           name : 'level',
@@ -1618,13 +1498,13 @@ function load_pdf_data(input) {
         //Perception is usually followed by a semicolon, but the sinspawn has a comma
         { re   : RegExp('^.*Perception\\s+\\+?(\\d+)[;,]?\\s*(.*)','ig'),
           func : (match) => {
-              senses = '';
+              let senses = '';
               if( match[2] ) {
                   senses = match[2].trim();
               }
               output.perception = {value : parseInt(match[1]),
                                    note  : senses
-                                  }
+                                  };
               return true;
           },
           name : 'perception',
@@ -1639,7 +1519,7 @@ function load_pdf_data(input) {
         },
         { re : RegExp('^Skills\\s+(.*)'),
           func : (match) => {
-              log('skills')
+              log('skills');
 
               for( var skill_text of match[1].split(',') ) {
 
@@ -1734,7 +1614,7 @@ function load_pdf_data(input) {
               // [7] == Will
               // [8] == Will notes
               // [9] == general save notes
-              var targets = ['ac', 'fortitude', 'reflex', 'will']
+              var targets = ['ac', 'fortitude', 'reflex', 'will'];
               for( var i = 0; i < targets.length; i++) {
                   let note_value = '';
                   if( data[i*2+2] ) {
@@ -1777,7 +1657,7 @@ function load_pdf_data(input) {
               }
 
               //That took care of HP, now let's look at immunities, weaknesses and resistances
-              var fields = ['immunities','weaknesses','resistances']
+              var fields = ['immunities','weaknesses','resistances'];
               var targets = ['immunity','weakness','resistance'];
 
               //We take everything up to the semicolon, which might potentially catch other fields if they omit it.
@@ -1837,8 +1717,8 @@ function load_pdf_data(input) {
               // than one. Perhaps that will always be the case as it's a strike? Hopefully!
               let notes = '';
               let damage = '0';
-              data = /(Melee|Ranged)\s+(\[.*?\])?(.*?)([+-]\d+)\s*(\(.*?\))?.*?Damage\s*(.*)$/ig.exec(match[0]);
-              log(data);
+              let data = /(Melee|Ranged)\s+(\[.*?\])?(.*?)([+-]\d+)\s*(\(.*?\))?.*?Damage\s*(.*)$/ig.exec(match[0]);
+
               if( null == data || !data[3] || !data[4] || !data[6] ) {
                   //Bloodseekers and maybe others don't have damage listed, just an effect...
                   data = /(Melee|Ranged)\s+(\[.*?\])?(.*?)([+-]\d+)\s*(\(.*?\))?.*(Effect\s*.*)$/ig.exec(match[0]);
@@ -1855,7 +1735,7 @@ function load_pdf_data(input) {
               if( data[5] ) {
                   traits = data[5].slice(1,-1);
               }
-              log(data);
+
               output.strikes.push({name : data[3].trim(),
                                    attack : data[4].trim(),
                                    traits : traits,
@@ -1911,7 +1791,7 @@ function load_pdf_data(input) {
               let type = match[1].trim();
               let DC = match[2];
               let spell_data = match[5];
-              let attack = ''
+              let attack = '';
               if( match[4] ) {
                   attack = match[4].trim();
               }
@@ -1927,7 +1807,7 @@ function load_pdf_data(input) {
               }
 
               //Do we have focus points?
-              let focus_points = ''
+              let focus_points = '';
               let focus_re = /\((\d+) focus points?\)/ig;
               let focus_match = focus_re.exec(spell_data);
               if( focus_match ) {
@@ -1936,7 +1816,7 @@ function load_pdf_data(input) {
               }
 
               //We start with constant as it should be at the end and we can cut it off after parsing it
-              let constant_re = /Constant \((.*)/g
+              let constant_re = /Constant \((.*)/g;
               let constant = constant_re.exec(spell_data);
               if( constant && constant[1] ) {
                   //We can have multiple constant spells at different levels, which looks like this:
@@ -1970,7 +1850,7 @@ function load_pdf_data(input) {
               // have multiple cantrips at different levels, but I don't know of any so let's not worry about
               // them for now
 
-              let cantrip_re = /Cantrips \((\d+)(st|nd|rd|th)\s*\)(.*)/g
+              let cantrip_re = /Cantrips \((\d+)(st|nd|rd|th)\s*\)(.*)/g;
               let cantrips = cantrip_re.exec(spell_data);
               let cantrip_level = '';
 
@@ -1990,7 +1870,7 @@ function load_pdf_data(input) {
 
               for(var i = 0; i < numerals.length; i++) {
                   let spell_level = '';
-                  let index = spell_data.indexOf(numerals[i])
+                  let index = spell_data.indexOf(numerals[i]);
                   if( index != -1 ) {
                       spell_level = spell_data.slice(index + numerals[i].length);
                       if( spell_level.indexOf(';') != -1 ) {
@@ -2001,7 +1881,7 @@ function load_pdf_data(input) {
                   spells[i+1].push(spell_level.trim());
               }
 
-              for(var i = 0; i < spells.length; i++) {
+              for(i = 0; i < spells.length; i++) {
                   spells[i] = spells[i].join(',');
               }
 
@@ -2053,7 +1933,7 @@ function load_pdf_data(input) {
           func : (match) => {log('affliction');},
           name : 'affliction',
         },
-    ]
+    ];
     var matched = {};
 
     let final_lines = [];
@@ -2155,7 +2035,7 @@ function load_pdf_data(input) {
                 let bad_chars = ['+','-','.'];
 
 
-                for( bad_word of bad_words ) {
+                for( var bad_word of bad_words ) {
                     if( title_words.indexOf(bad_word) != -1 ){
                         possible_ability = false;
                         break;
@@ -2257,6 +2137,7 @@ function load_pdf_data(input) {
         line = line.trim();
         let remove = null;
         let handled = false;
+        let match = null
         for( var i = 0; i < matchers.length; i++) {
             matchers[i].re.lastIndex = 0;
             match = matchers[i].re.exec(line);
@@ -2336,10 +2217,10 @@ function get_and_parse_character(msg) {
                 let format = 'none';
                 if( json ) {
                     parse_json_character(character, JSON.parse(json));
-                    format = 'JSON'
+                    format = 'JSON';
                 }
                 else {
-                    data = load_pdf_data(notes);
+                    let data = load_pdf_data(notes);
                     if( data ) {
                         parse_json_character(character, data);
                         format = 'PDF';
@@ -2354,7 +2235,7 @@ function get_and_parse_character(msg) {
                 if( !unknown_name ) {
                     set_attribute(id, 'unknown_name', name);
                 }
-                sendChat(module_name, `/w gm Character ${name} parsed successfully using ${format} format`)
+                sendChat(module_name, `/w gm Character ${name} parsed successfully using ${format} format`);
             }
             catch(err) {
                 log('got error ' + err);
@@ -2386,7 +2267,6 @@ function handle_api(msg) {
                     'ability-checks' : show_ability_check_buttons,
                     'saves'          : show_save_buttons,
                     'abilities'      : show_ability_buttons,
-                    //'reactions'      : show_reaction_buttons,
                     'spells'         : show_spell_buttons,
                     'secret-skill'   : roll_secret_skill,
                     'secret-skills'  : show_secret_skills_buttons,
@@ -2410,10 +2290,11 @@ function handle_whisper(msg) {
     //log('whisper');
     log(msg.content);
     log(msg.inlinerolls);
-    log('***')
+    log('***');
     //log(msg.playerid);
     //log(msg.target);
     //log(msg.rolltemplate);
+    let roll = null;
 
     if(msg.content.match('name=\\^{traits}}}')) {
         roll = new SpellRoll(msg.content, msg.inlinerolls);
@@ -2443,7 +2324,8 @@ function handle_general(msg) {
         return;
     }
     if(msg.content.match('{{roll01_type=attack')) {
-        roll = new AttackRoll(msg.content, msg.inlinerolls);
+        let roll = new AttackRoll(msg.content, msg.inlinerolls);
+        //shouldn't we do something with that?
     }
 }
 
@@ -2469,8 +2351,14 @@ on("chat:message", function(msg) {
 function delete_repeating(id, stub) {
     const [IDs, attributes] = getRepeatingSectionAttrs(id,stub);
     for(var i in IDs) {
+        if( !i ) {
+            continue;
+        }
         var attrs = attributes[IDs[i]];
         for(var name in attrs) {
+            if( !name ) {
+                continue;
+            }
             attrs[name].remove();
         }
     }
@@ -2497,9 +2385,9 @@ function disable_spellcaster(id) {
     }
     log(`Initial toggles "${toggles}"`);
 
-    toggles = toggles.split(',')
-    var new_toggles = []
-    let ignore = ['npcspellcaster','innate','focus','cantrips','normalspells']
+    toggles = toggles.split(',');
+    var new_toggles = [];
+    let ignore = ['npcspellcaster','innate','focus','cantrips','normalspells'];
 
     for( var toggle of Object.keys(toggle_buttons) ) {
         set_attribute(id, toggle_buttons[toggle][0], 0);
@@ -2605,23 +2493,15 @@ function format_damage_for_display(damage) {
 
 function add_attacks(id, roll_type, roll_num, attack_type, message) {
     message.push(`{{roll0${roll_num}_name=${attack_type}}} `);
-    //var num_attacks = getRepeatingSectionCounts(id,`repeating_${attack_type}-strikes`);
     const [IDs, attributes] = getRepeatingSectionAttrs(id,`repeating_${attack_type}-strikes`);
-    var num_attacks = IDs.length;
-    var show_bonus = true;
     var bonus_matcher = RegExp("\\+?(\\d+)");
     let sheet_type = getAttrByName(id, 'sheet_type');
 
-    //var num_attacks = all_attrs.length;
-    //log(num_attacks);
-    //log(IDs);
-    //log(attributes);
-    //var roll_num = 1;
-
     for(var i in IDs) {
+        if(!i) {
+            continue;
+        }
         var attrs = attributes[IDs[i]];
-        log('jimbo ' + i);
-        log(attrs);
         let name  = attrs['weapon'];
         if(name) {
             name = name.get('current');
@@ -2629,15 +2509,15 @@ function add_attacks(id, roll_type, roll_num, attack_type, message) {
         else {
             name = "";
         }
-        let bonus = attrs['weapon_strike'];
-        let traits = attrs['weapon_traits'];
+        let bonus = attrs.weapon_strike;
+        let traits = attrs.weapon_traits;
         if(traits) {
             traits = '**(' + traits.get('current') + ')**';
         }
         else {
             traits = "";
         }
-        let damage = attrs['weapon_strike_damage'];
+        let damage = attrs.weapon_strike_damage;
         if(damage) {
             if( sheet_type == 'npc' && traits.toLowerCase().includes('forceful') ) {
                 //We want to add a bonus to damage
@@ -2651,7 +2531,7 @@ function add_attacks(id, roll_type, roll_num, attack_type, message) {
         else {
             damage = "";
         }
-        let damage_type = attrs['weapon_strike_damage_type'];
+        let damage_type = attrs.weapon_strike_damage_type;
         if(damage_type) {
             damage_type = damage_type.get('current');
         }
@@ -2683,7 +2563,7 @@ function add_attacks(id, roll_type, roll_num, attack_type, message) {
                 }
                 let pen_2 = -map;
                 let pen_3 = -2*map;
-                new_bonus += `([[?{Attack|1st,0|2nd ${pen_2},1|3rd+ ${pen_3},2}*(-${map})]][MAP])`
+                new_bonus += `([[?{Attack|1st,0|2nd ${pen_2},1|3rd+ ${pen_3},2}*(-${map})]][MAP])`;
                 bonus.set('current',new_bonus);
             }
         }
@@ -2735,8 +2615,6 @@ function show_attack_buttons(msg) {
 }
 
 function add_spells(id, roll_num, spell_type, spell_type_name, message) {
-
-    //var num_attacks = getRepeatingSectionCounts(id,`repeating_${attack_type}-strikes`);
     const [IDs, attributes] = getRepeatingSectionAttrs(id,`repeating_${spell_type}`);
     var num_spells = IDs.length;
     if(num_spells == 0) {
@@ -2765,14 +2643,12 @@ function add_spells(id, roll_num, spell_type, spell_type_name, message) {
 }
 
 function add_full_spells(id, spell_type, spell_type_name, message) {
-
-    //var num_attacks = getRepeatingSectionCounts(id,`repeating_${attack_type}-strikes`);
     const [IDs, attributes] = getRepeatingSectionAttrs(id,`repeating_${spell_type}`);
     var num_spells = IDs.length;
     if(num_spells == 0) {
         return roll_num;
     }
-    spell_levels = {}
+    let spell_levels = {}
     for(var i = 1; i <= 10; i++ ) {
         spell_levels[i] = [];
     }
@@ -2843,49 +2719,10 @@ function show_spell_buttons(msg) {
     sendChat(module_name, message.join(" ") );
 }
 
-function show_secret_lore_buttons(id, msg) {
-    //we want to get all the attacks for the character given by id
-    //var character = getObj("character", id);
-    var name = getAttrByName(id, 'character_name');
-    //log(getRepeatingSectionAttrs(id, 'repeating_lore'));
-
-    //var attacks = getAttrByName(id, "repeating_npc-weapon_$1_macro-text-npc");
-    const [IDs, attributes] = getRepeatingSectionAttrs(id,'repeating_lore');
-
-    //var num_abilities = getRepeatingSectionCounts(id,attr);
-
-    var message = [`/w ${msg.who} &{template:rolls} {{header=${name} Secret Lore}} `];
-
-    for(var i in IDs) {
-        var attrs = attributes[IDs[i]];
-        //let name  = getAttrByName(id, `${attr}_$${i}_name`);
-        let lore_name = attrs['lore_name'];
-        if(lore_name) {
-            lore_name = lore_name.get('current');
-        }
-        else {
-            lore_name = 'unknown';
-        }
-        let bonus = attrs['lore'];
-        if( bonus ) {
-            bonus = bonus.get('current');
-        }
-        else {
-            bonus = 0;
-        }
-        let n = parseInt(i)+1;
-        message.push(`{{info0${n}_name=**${lore_name}**}} {{info0${n}=[**Roll**](!secret {{id=${id}&#125;} {{bonus=${bonus}&#125;} {{name=${lore_name} Lore&#125;!&#13;/me rolls a secret ${lore_name} Lore check...)}}`);
-    }
-
-    sendChat(module_name, message.join(" "));
-}
-
 function show_secret_skills_buttons(msg) {
-    var skill_names = ['PERCEPTION', 'ACROBATICS', 'ARCANA', 'ATHLETICS', 'CRAFTING', 'DECEPTION', 'DIPLOMACY', 'INTIMIDATION',
-    'MEDICINE', 'NATURE', 'OCCULTISM', 'PERFORMANCE', 'RELIGION', 'SOCIETY', 'STEALTH', 'SURVIVAL', 'THIEVERY'];
-    //var id = RegExp("{{id=([^}]*)}}").exec(msg.content)[1];
-    //let message = get_list_buttons(msg, 'Skills', skill_names);
-    //var name = getAttrByName(id, 'character_name');
+    var skill_names = ['PERCEPTION', 'ACROBATICS', 'ARCANA', 'ATHLETICS', 'CRAFTING', 'DECEPTION', 'DIPLOMACY',
+                       'INTIMIDATION', 'MEDICINE', 'NATURE', 'OCCULTISM', 'PERFORMANCE', 'RELIGION', 'SOCIETY',
+                       'STEALTH', 'SURVIVAL', 'THIEVERY'];
 
     var message = [`/w ${msg.who} &{template:rolls} {{header=Secret Skills}} {{desc=`]
 
@@ -2893,7 +2730,7 @@ function show_secret_skills_buttons(msg) {
         message.push(`[${skill}](!secret-skill {{skill=${skill}&#125;})`);
     }
 
-    all_lores = new Set();
+    let all_lores = new Set();
 
     //Also add any lores that any of the selected players have
     for( var obj_id of msg.selected ) {
@@ -2951,10 +2788,6 @@ function show_ability_buttons(msg) {
     show_generic_ability_buttons(msg, "repeating_actions-activities", "Offensive or Proactive Abilities");
 }
 
-function show_reaction_buttons(msg) {
-    show_generic_ability_buttons(msg, "repeating_free-actions-reactions", "Reactions & Free-actions");
-}
-
 function get_list_buttons(msg, list_name, list) {
     //we want to get all the attacks for the character given by id
     var id = RegExp("{{id=([^}]*)}}").exec(msg.content)[1];
@@ -3002,7 +2835,7 @@ function show_save_buttons(msg) {
 }
 
 function show_ability_check_buttons(msg) {
-    message = get_list_buttons(msg, 'Ability Checks', ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']);
+    let message = get_list_buttons(msg, 'Ability Checks', ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']);
     show_list_buttons(message);
 }
 
@@ -3040,8 +2873,8 @@ on("ready", function() {
     // On page creation we're going to make sure the table has all the macros we know will be wanted. This
     // might annoy GMs if they've deleted a macro they don't want and we keep creating it, so we should allow
     // this to be turned off somehow
-    macros = findObjs({type : 'macro'});
-    required_macros = [
+    let macros = findObjs({type : 'macro'});
+    let required_macros = [
         {
             name : 'abilities',
             require : '!abilities',
@@ -3103,7 +2936,6 @@ on("ready", function() {
     let have_macros = new Set();
 
     for( var macro of macros ) {
-        let name = macro.get('name');
         let action = macro.get('action');
         let match = /^(![^\s]+)/.exec(action);
         if( !match || !match[1] ) {
@@ -3115,7 +2947,7 @@ on("ready", function() {
     }
 
     //To create a macro we need the GM playerid
-    playerids = findObjs({type : 'player'});
+    let playerids = findObjs({type : 'player'});
     let gmid = null;
     for( var player of playerids ) {
         if( playerIsGM(player.id) ){
