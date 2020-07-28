@@ -1414,9 +1414,22 @@ function num_title_case(words) {
 
 function num_in_title(words) {
     let n = num_title_case(words);
+    //words which ought never appear in an ability name
+    let non_title_words = ['DC'];
 
+    // num_title_case is likely to include the first word of the ability description because it probably
+    // starts with a capital, but it might not if it's one of the non-principals. We know the ability
+    // description must start with a capital letter regardless, so step backwards until that is satisfied
     while(n > 0 && words[n] && is_lower_case(words[n][0]) ) {
         n -= 1;
+    }
+
+    // Next we know that some words will never appear in an ability name (like DC)
+    for(var i = 0; i < n; i++) {
+        if( non_title_words.indexOf(words[i]) != -1 ) {
+            n = i;
+            break;
+        }
     }
 
     return n;
@@ -1725,6 +1738,14 @@ function load_pdf_data(input) {
               if( data[3] ) {
                   output.hp.note = data[3].trim();
               }
+              else {
+                  output.hp.note = '';
+              }
+              //Is there hardness?
+              let hardness_match = /(hardness[^;]*)/ig.exec(data[4]);
+              if( hardness_match && hardness_match[1] ) {
+                  output.hp.note += hardness_match[1].trim();
+              }
 
               //That took care of HP, now let's look at immunities, weaknesses and resistances
               var fields = ['immunities','weaknesses','resistances']
@@ -1770,7 +1791,8 @@ function load_pdf_data(input) {
               // than one. Perhaps that will always be the case as it's a strike? Hopefully!
               let notes = '';
               let damage = '0';
-              data = /(Melee|Ranged)\s+(\[.*?\])?(.*?)([+-]\d+)\s*(\(.*?\))?.*Damage\s*(.*)$/ig.exec(match[0]);
+              data = /(Melee|Ranged)\s+(\[.*?\])?(.*?)([+-]\d+)\s*(\(.*?\))?.*?Damage\s*(.*)$/ig.exec(match[0]);
+              log(data);
               if( null == data || !data[3] || !data[4] || !data[6] ) {
                   //Bloodseekers and maybe others don't have damage listed, just an effect...
                   data = /(Melee|Ranged)\s+(\[.*?\])?(.*?)([+-]\d+)\s*(\(.*?\))?.*(Effect\s*.*)$/ig.exec(match[0]);
@@ -1921,6 +1943,14 @@ function load_pdf_data(input) {
           },
           name : 'spells',
         },
+        { re  : RegExp('^(.*)Rituals DC (\\d+)(.*attack ([+-]\\d+))?(.*)$',''),
+          func : (match) => {
+              log('Rituals');
+              //we don't parse them here as we want them processed as an ability, but causing this to match
+              //allows our "first ability" tracker to be accurate
+          },
+          name : 'rituals',
+        },
         // Via some PDF magic it seems that we get action symbols translated into cool "[one-action]" type
         // text which we can use. It doesn't help us if it's a passive ability, but it helps with a lot of
         // things. Note that melee and ranged should already have been picked up, so this ought to get
@@ -1941,6 +1971,7 @@ function load_pdf_data(input) {
 
     let final_lines = [];
     let current_lines = [];
+    var first_ability = true;
 
     // The first pass will be to fold lines together so we have one line for each thing. The only difficult
     // part to that is special abilities that don't have an action because we can't match on an initial
@@ -1954,6 +1985,10 @@ function load_pdf_data(input) {
         if( /^\s*\d+\s*$/.exec(line) ) {
             continue;
         }
+        // If the stat block went over a page boundary we probably also have our watermark which should include our email address inside carrots
+        if( /&lt;.*@.*&gt;/g.exec(line) ) {
+            continue;
+        }
         line = line.trim();
         if( !line ) {
             continue;
@@ -1965,6 +2000,15 @@ function load_pdf_data(input) {
                 match = matchers[i].re.exec(line);
                 if( match ) {
                     matched[matchers[i].name] = true;
+                    //when we hit speeds we're in the offensve abilites so we should reset the first count
+                    log(matchers[i].name);
+                    if( matchers[i].name == 'speeds' || matchers[i].name == 'saves' ) {
+                        log('SET FA');
+                        first_ability = true;
+                    }
+                    if( matchers[i].name == 'affliction' || matchers[i].name == 'action' ) {
+                        first_ability = false;
+                    }
                     break;
                 }
             }
@@ -1983,6 +2027,7 @@ function load_pdf_data(input) {
             // only way to tell here is to look at if the first two words are in title case.
             let words = line.split(' ');
             var possible_ability = words.length > 2;
+            log('PA 1: ' + line);
             if( possible_ability ) {
                 if( words[0] == 'Critical' && (words[1] =='Success' || words[1] == 'Failure') ) {
                     possible_ability = false;
@@ -2006,16 +2051,15 @@ function load_pdf_data(input) {
             if( possible_ability && num_title < 1 ) {
                 possible_ability = false;
             }
-
-            // if( possible_ability && (false == is_upper_case(words[num_in_title_case - 1][0])) ) {
-            //     log('badness ' + words[num_in_title_case - 1]);
-            //     possible_ability = false;
-            // }
+            log(words);
+            log(num_title);
 
             if( possible_ability ) {
                 //we can also rule out this ability if it's got any of a short list of bad words in it
                 let bad_words = ['GM'];
-                let bad_titles = ['damage','stage'];
+                //Or if it's exactly equal to something no ability would be called
+                let bad_titles = ['damage','stage','hit','constant','effect','requirement','the'];
+                let bad_chars = ['+','-','.'];
                 let test_words = words.slice(0, num_title);
                 let putative_title = test_words.join(" ").trim();
                 for( bad_word of bad_words ) {
@@ -2025,22 +2069,53 @@ function load_pdf_data(input) {
                     }
                 }
                 //similarly if there are any full stops we can reject it
-                if(putative_title.indexOf('.') != -1) {
-                    possible_ability = false;
+                for( var bad_char of bad_chars ) {
+                    if( putative_title.indexOf(bad_char) != -1 ) {
+                        possible_ability = false;
+                        break;
+                    }
                 }
                 //abilities are unlikely to be called "damage", and we've probably just not connected it to the previous melee
-                else if(bad_titles.indexOf(putative_title.toLowerCase()) != -1) {
+                if(bad_titles.indexOf(putative_title.toLowerCase()) != -1) {
                     possible_ability = false;
+                }
+            }
+
+            if( possible_ability ) {
+                if( words.length == num_title ) {
+                    //there needs to be something in the ability
+                    possible_ability = false;
+                }
+                else if( false == is_upper_case(words[num_title][0]) ) {
+                    //We expect an ability to start with one of three things:
+                    // an action like [one-action]
+                    // a list of traits (blah, jim)
+                    // a capital letter of a description
+                    if( words[num_title][0] != '(' && words[num_title][0] != '[' ){
+                        possible_ability = false;
+                    }
                 }
             }
 
             if( possible_ability && last_line ) {
                 //So we've got title case, but what if we have just started a sentance?
                 //TODO: We could also rule out the creatures name here?
-
+                log('jimbo21 ' + first_ability);
+                log(line);
                 let last_index = last_line.lastIndexOf('.');
                 let last_sentence = '';
-                if( last_index != -1 ) {
+                if( false == first_ability ) {
+                    //Abilities *ought* to end with a full stop. If this is the second or subsequent ability
+                    //in this section we can rule out starting a new one if we're in the middle of a
+                    //sentence. Maybe
+                    if( last_index == -1 ) {
+                        possible_ability = false;
+                    }
+                    else if( last_line.slice(last_index + 1).trim() != "" ) {
+                        possible_ability = false;
+                    }
+                }
+                else if( last_index != -1 ) {
                     last_sentence = last_line.slice(last_index + 1);
                     words = last_sentence.trim();
                     if(words) {
@@ -2055,11 +2130,12 @@ function load_pdf_data(input) {
                 current_lines.push(line);
                 continue;
             }
-            // else {
-            //     log("PA: " + line);
-            //     log(words);
-            //     log('---');
-            // }
+            else {
+                first_ability = false;
+                log("PA: " + line);
+                log(words);
+                log('---');
+            }
         }
 
         //If we get here we have a match so this is starting a block. All preceding lines should be merged onto one
