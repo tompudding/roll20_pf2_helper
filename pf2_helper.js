@@ -1,5 +1,5 @@
 var module_name = 'PF2 Helper';
-var module_version = 'v1.0';
+var module_version = 'v1.01';
 
 function get_index(msg) {
     var roll_match = RegExp("\\$\\[\\[(\\d+)\\]\\]");
@@ -513,7 +513,7 @@ function roll_secret_skill(msg) {
         }
         bonus = parseInt(bonus);
         message.push(`{{roll0${i+1}=[[1d20+${bonus}]]}} {{roll0${i+1}_name=${name}}}`);
-        if( sheet_type == 'character' ) {
+        if( sheet_type != 'npc' ) {
             //We can also stick the characters training with the skill on for players
             let rank = getAttrByName(characters[i].id, `${skill_upper}_rank`);
             var ranks = { 0 : 'Untrained' ,
@@ -2254,6 +2254,10 @@ function show_config_options(msg) {
     let command = /!pf2-config (.*)/.exec(msg.content);
     let message = [`/w ${msg.who} &{template:default} {{name=${module_name} ${module_version} Config}}`];
     let extra_message = '';
+
+    if( false == playerIsGM(msg.playerid) ) {
+        sendChat(module_name, `/w ${msg.who} ${module_name} config is restricted to the table GM`);
+    }
 
     if( command && command[1] ) {
         extra_message = '{{Re-parse NPCs to use new values=}}';
