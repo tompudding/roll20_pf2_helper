@@ -1,5 +1,5 @@
 var module_name = 'PF2 Helper';
-var module_version = 'v1.02';
+var module_version = 'v1.03';
 
 var skill_names = ['PERCEPTION', 'ACROBATICS', 'ARCANA', 'ATHLETICS', 'CRAFTING', 'DECEPTION', 'DIPLOMACY',
                    'INTIMIDATION', 'MEDICINE', 'NATURE', 'OCCULTISM', 'PERFORMANCE', 'RELIGION', 'SOCIETY',
