@@ -1,5 +1,9 @@
 var module_name = 'PF2 Helper';
-var module_version = 'v1.01';
+var module_version = 'v1.02';
+
+var skill_names = ['PERCEPTION', 'ACROBATICS', 'ARCANA', 'ATHLETICS', 'CRAFTING', 'DECEPTION', 'DIPLOMACY',
+                   'INTIMIDATION', 'MEDICINE', 'NATURE', 'OCCULTISM', 'PERFORMANCE', 'RELIGION', 'SOCIETY',
+                   'STEALTH', 'SURVIVAL', 'THIEVERY'];
 
 function get_index(msg) {
     var roll_match = RegExp("\\$\\[\\[(\\d+)\\]\\]");
@@ -442,6 +446,18 @@ const getRepeatingSectionAttrs = function (charid, prefix) {
     return [repRowIds, wtf_functional_madness];
 };
 
+function canonical_lore_name(name) {
+    //try to rationalise them a bit to guard against different spacing etc
+    lore_parts = name.split(/\s+/g);
+    if( lore_parts.length > 0 && lore_parts[lore_parts.length - 1].toLowerCase() != 'lore' ) {
+        lore_parts.push('Lore');
+    }
+    for( var j = 0; j < lore_parts.length; j++) {
+        lore_parts[j] = title_case(lore_parts[j]);
+    }
+
+    return lore_parts.join(' ');
+}
 function roll_secret_skill(msg) {
     let characters = [];
     for( var obj_id of msg.selected ) {
@@ -456,6 +472,10 @@ function roll_secret_skill(msg) {
     let matches=RegExp("{{skill=([^}]*)}}","g").exec(msg.content);
     let skill = matches[1];
     let skill_upper = skill.toUpperCase();
+    let is_lore = false;
+    if( skill.toLowerCase().endsWith('lore') ) {
+        is_lore = true;
+    }
 
     // We'll do the output differently depending on if we have just one or not. For a single roll we'll do the
     // normal macro
@@ -465,12 +485,13 @@ function roll_secret_skill(msg) {
     let message = [`/w GM &{template:rolls} {{header=Secret ${skill}}}`];
     for( var i = 0; i < characters.length; i++) {
         let bonus = 0;
-        let is_lore = false;
         let has_lore = false;
-        if( skill.toLowerCase().endsWith('lore') ) {
+        let rank = 0;
+        let sheet_type = getAttrByName(characters[i].id, 'sheet_type');
+
+        if( is_lore ) {
             // Getting the bonus here is a little different. We need to loop through the lores of this
             // character and see if any of the names match this one
-            is_lore = true;
             const [IDs, attributes] = getRepeatingSectionAttrs(characters[i].id,'repeating_lore');
 
             for(var j in IDs) {
@@ -481,15 +502,24 @@ function roll_secret_skill(msg) {
                 let lore_name = attrs.lore_name;
 
                 if(lore_name) {
-                    lore_name = lore_name.get('current');
+                    lore_name = canonical_lore_name(lore_name.get('current'));
                 }
+
                 if(lore_name && lore_name.toLowerCase().trim() == skill.toLowerCase().trim()) {
                     bonus = attrs.lore;
 
-                    if( bonus ) {
-                        bonus = bonus.get('current');
-                        has_lore = true;
-                        break;
+                    if( !bonus ) {
+                        continue;
+                    }
+
+                    bonus = bonus.get('current');
+                    has_lore = true;
+                    let lore_rank = attrs.lore_rank;
+                    log('checking lore_rank ');
+                    log(lore_rank);
+                    if( sheet_type != 'npc' && lore_rank ) {
+                        rank = parseInt(lore_rank.get('current'));
+                        log('rank ' + rank);
                     }
                 }
             }
@@ -500,9 +530,9 @@ function roll_secret_skill(msg) {
         }
         else {
             bonus = getAttrByName(characters[i].id, skill);
+            rank = getAttrByName(characters[i].id, `${skill_upper}_rank`);
         }
         let name = getAttrByName(characters[i].id, 'character_name');
-        let sheet_type = getAttrByName(characters[i].id, 'sheet_type');
 
         while(bonus && bonus.startsWith != undefined && bonus.startsWith('+')) {
             bonus = bonus.slice(1);
@@ -515,7 +545,6 @@ function roll_secret_skill(msg) {
         message.push(`{{roll0${i+1}=[[1d20+${bonus}]]}} {{roll0${i+1}_name=${name}}}`);
         if( sheet_type != 'npc' ) {
             //We can also stick the characters training with the skill on for players
-            let rank = getAttrByName(characters[i].id, `${skill_upper}_rank`);
             var ranks = { 0 : 'Untrained' ,
                           2 : 'Trained',
                           4 : 'Expert',
@@ -2735,10 +2764,6 @@ function show_spell_buttons(msg) {
 }
 
 function show_secret_skills_buttons(msg) {
-    var skill_names = ['PERCEPTION', 'ACROBATICS', 'ARCANA', 'ATHLETICS', 'CRAFTING', 'DECEPTION', 'DIPLOMACY',
-                       'INTIMIDATION', 'MEDICINE', 'NATURE', 'OCCULTISM', 'PERFORMANCE', 'RELIGION', 'SOCIETY',
-                       'STEALTH', 'SURVIVAL', 'THIEVERY'];
-
     var message = [`/w ${msg.who} &{template:rolls} {{header=Secret Skills}} {{desc=`]
 
     for(var skill of skill_names) {
@@ -2761,7 +2786,8 @@ function show_secret_skills_buttons(msg) {
             //let name  = getAttrByName(id, `${attr}_$${i}_name`);
             let lore_name = attrs['lore_name'];
             if(lore_name) {
-                lore_name = lore_name.get('current');
+                lore_name = canonical_lore_name(lore_name.get('current'));
+
                 all_lores.add(lore_name);
             }
         }
@@ -2822,9 +2848,6 @@ function show_list_buttons(message) {
 
 
 function show_skills_buttons(msg) {
-    var skill_names = ['PERCEPTION', 'ACROBATICS', 'ARCANA', 'ATHLETICS', 'CRAFTING', 'DECEPTION', 'DIPLOMACY',
-                       'INTIMIDATION', 'MEDICINE', 'NATURE', 'OCCULTISM', 'PERFORMANCE', 'RELIGION', 'SOCIETY',
-                       'STEALTH', 'SURVIVAL', 'THIEVERY'];
     var id = RegExp("{{id=([^}]*)}}").exec(msg.content)[1];
     let message = get_list_buttons(msg, 'Skills', skill_names);
 
@@ -2835,7 +2858,7 @@ function show_skills_buttons(msg) {
         //let name  = getAttrByName(id, `${attr}_$${i}_name`);
         let lore_name = attrs['lore_name'];
         if(lore_name) {
-            lore_name = lore_name.get('current');
+            lore_name = canonical_lore_name(lore_name.get('current'));
         }
         message.push(`[${lore_name}](!&#13;&#37;{selected|repeating_lore_${IDs[i]}_LORE})`);
     }
