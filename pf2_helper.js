@@ -753,10 +753,17 @@ function link_token_bars(character) {
         token.set('bar1_value', hp.get('current'));
         token.set('bar1_max', hp.get('max'));
 
+        let name = getAttrByName(character.id, 'character_name');
+        let ac = get_attribute(character.id, 'armor_class');
+
+        token.set('name', `${name} AC:${ac}`);
+        token.set('showname', true);
+
         if( focus && focus.get('max') > 0 ) {
             token.set('bar2_value', focus.get('current'));
             token.set('bar2_max', focus.get('max'));
         }
+        setDefaultTokenForCharacter(character, token);
     }
 }
 
