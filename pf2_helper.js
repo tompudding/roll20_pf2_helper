@@ -2311,6 +2311,10 @@ function show_config_options(msg) {
             state.pf2_helper.sounds = !state.pf2_helper.sounds;
             extra_message = '';
             break;
+        case 'toggle_macros':
+            state.pf2_helper.create_macros = !state.pf2_helper.create_macros;
+            extra_message = '';
+            break;
         default:
             extra_message = '';
         }
@@ -2320,6 +2324,7 @@ function show_config_options(msg) {
     message.push(`{{Use MAP popups=[${state.pf2_helper.use_map_popups}](!pf2-config toggle_popups)}}`)
     message.push(`{{Use Sweep/other popups=[${state.pf2_helper.use_other_popups}](!pf2-config toggle_other_popups)}}`)
     message.push(`{{Use sounds=[${state.pf2_helper.sounds}](!pf2-config toggle_sounds)}}`)
+    message.push(`{{Create Macros on Start=[${state.pf2_helper.create_macros}](!pf2-config toggle_macros)}}`)
     message.push(extra_message);
 
     sendChat(module_name, message.join(' '));
@@ -2917,7 +2922,12 @@ on("ready", function() {
             use_map_popups : true,
             use_other_popups : true,
             sounds : true,
+            create_macros : true,
         };
+    }
+
+    if( !state.pf2_helper.create_macros ) {
+        return;
     }
 
     // On page creation we're going to make sure the table has all the macros we know will be wanted. This
