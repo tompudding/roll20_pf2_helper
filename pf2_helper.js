@@ -1,5 +1,5 @@
 var module_name = 'PF2 Helper';
-var module_version = 'v1.03';
+var module_version = 'v1.04';
 
 var skill_names = ['PERCEPTION', 'ACROBATICS', 'ARCANA', 'ATHLETICS', 'CRAFTING', 'DECEPTION', 'DIPLOMACY',
                    'INTIMIDATION', 'MEDICINE', 'NATURE', 'OCCULTISM', 'PERFORMANCE', 'RELIGION', 'SOCIETY',
@@ -26,7 +26,7 @@ function set_attribute(id, attr_name, value) {
 function get_attribute(id, attr_name) {
     let objs = findObjs({type : 'attribute', characterid:id, name:attr_name});
     if( objs.length == 0 ) {
-        log('no attribute darn');
+        log('no attribute darn: ' + attr_name);
         return undefined;
     }
     return objs[0].get('current');
@@ -693,6 +693,13 @@ function parse_damage(damage_string) {
         additional = type_parts.slice(type_end).join(' ') + additional;
     }
 
+    if(damage == undefined) {
+        // Sometimes we don't find any damage. For example, an alchemist will have "bomb + 8 damage varies by
+        // bomb". No roll at all. In that case we'll pick up the text as additional, but really it should go
+        // into damage and have no additional
+        damage = '0';
+    }
+
     return {damage : damage,
     	    type : type,
             additional : additional};
@@ -959,7 +966,6 @@ function parse_json_character(character, data) {
                 if( null == damage ) {
                     continue;
                 }
-
                 set_attribute(character.id, stub + 'weapon', strike.name);
                 set_attribute(character.id, stub + 'weapon_strike', strike.attack);
                 set_attribute(character.id, stub + 'weapon_traits', strike.traits);

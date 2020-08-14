@@ -70,3 +70,11 @@ If you have a sound called "critical_threat" it will play when an attack roll wi
 Bugs and Feature Requests
 ----
 Please send bug reports or feature requests to tom.pudding@gmail.com
+
+Changelog
+---------
+
+## 1.04
+
+* Fixed issue parsing strike damage entries that don't include dice, such as "Varies by bomb". Thanks to Dr. Thod for reporting.
+* Added a changelog
