@@ -2315,6 +2315,7 @@ function show_config_options(msg) {
         switch(command[1]) {
         case 'toggle_hide':
             state.pf2_helper.hide_rolls = !state.pf2_helper.hide_rolls;
+            init_macros();
             break;
         case 'toggle_popups':
             state.pf2_helper.use_map_popups = !state.pf2_helper.use_map_popups;
@@ -2902,53 +2903,19 @@ function show_ability_check_buttons(msg) {
     show_list_buttons(message);
 }
 
-on('change:campaign:turnorder', function() {
-    try {
-        var turnorder = Campaign().get("turnorder");
-        if(turnorder == "")
-            return;
-        turnorder = JSON.parse(turnorder);
-
-        //Get the person at the top of the order
-        turn_off_marker_token(turnorder[0]['id'], 'Reaction');
-    }
-    catch(err) {
-        log(err);
-        log('why');
-    }
-});
-
-on('change:campaign:initiativepage', function() {
-    try {
-        var turnorder_visible = Campaign().get("initiativepage");
-        if( turnorder_visible ) {
-            play('roll_for_initiative');
-        }
-    }
-    catch(err) {
-        log(err);
-    }
-});
-
-on("ready", function() {
-    if( !state.pf2_helper ) {
-        state.pf2_helper = {
-            hide_rolls : true,
-            use_map_popups : true,
-            use_other_popups : true,
-            sounds : true,
-            create_macros : true,
-        };
-    }
-
-    if( !state.pf2_helper.create_macros ) {
-        return;
-    }
+function init_macros() {
 
     // On page creation we're going to make sure the table has all the macros we know will be wanted. This
     // might annoy GMs if they've deleted a macro they don't want and we keep creating it, so we should allow
     // this to be turned off somehow
     let macros = findObjs({type : 'macro'});
+    let parse_full = '!pf2-parse {{id=@{selected|character_id}}}';
+    if( state.pf2_helper.hide_rolls ) {
+        parse_full += ' {{unknown_name=?{What name should the players see? Set to empty string to use actual name|Scary Monster}}}';
+    }
+    else {
+        parse_full += ' {{unknown_name=Strange Monster}}';
+    }
     let required_macros = [
         {
             name : 'abilities',
@@ -2968,7 +2935,7 @@ on("ready", function() {
         {
             name : 'parse',
             require : '!pf2-parse',
-            full : '!pf2-parse {{id=@{selected|character_id}}} {{unknown_name=?{What name should the players see? Set to empty string to use actual name|Scary Monster}}}',
+            full : parse_full,
             token_action : false,
         },
         {
@@ -3018,6 +2985,14 @@ on("ready", function() {
         }
 
         log('Have existing macro: ' + match[1]);
+
+        if( action.startsWith('!pf2-parse') ) {
+            // This is a special one which we might want to rewrite
+            if( action != parse_full ) {
+                macro.set('action',parse_full);
+            }
+        }
+
         have_macros.add(match[1]);
     }
 
@@ -3055,5 +3030,49 @@ on("ready", function() {
             istokenaction : macro.token_action,
             visibleto : visibleto});
 
+    }
+}
+
+on('change:campaign:turnorder', function() {
+    try {
+        var turnorder = Campaign().get("turnorder");
+        if(turnorder == "")
+            return;
+        turnorder = JSON.parse(turnorder);
+
+        //Get the person at the top of the order
+        turn_off_marker_token(turnorder[0]['id'], 'Reaction');
+    }
+    catch(err) {
+        log(err);
+        log('why');
+    }
+});
+
+on('change:campaign:initiativepage', function() {
+    try {
+        var turnorder_visible = Campaign().get("initiativepage");
+        if( turnorder_visible ) {
+            play('roll_for_initiative');
+        }
+    }
+    catch(err) {
+        log(err);
+    }
+});
+
+on("ready", function() {
+    if( !state.pf2_helper ) {
+        state.pf2_helper = {
+            hide_rolls : true,
+            use_map_popups : true,
+            use_other_popups : true,
+            sounds : true,
+            create_macros : true,
+        };
+    }
+
+    if( state.pf2_helper.create_macros ) {
+        init_macros();
     }
 });
