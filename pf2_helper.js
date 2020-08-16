@@ -1802,25 +1802,30 @@ function load_pdf_data(input) {
         // After creature we can get traits which are all caps
         { re   : RegExp('^\\s*([A-Z]+\\s*)+$',''),
           func : (match) => {
-              let trait = match[0].trim();
+              let traits = match[0].trim();
               if( !trait ) {
                   return;
               }
-              //If this is an alignment trait lets set that too
-              if( trait == 'N' ||
-                  (trait.length == 2 && 'LNC'.indexOf(trait[0]) != -1 && 'GNE'.indexOf(trait[1]) != -1 )) {
-                  output.alignment = trait;
-                  return true;
-              }
-              if( valid_sizes.indexOf(trait.toLowerCase()) != -1 ) {
-                  output.size = trait.trim();
-                  return true;
-              }
-              if( !output.traits ) {
-                  output.traits = [match[0].trim()];
-              }
-              else {
-                  output.traits.push(match[0].trim());
+              // Traits when copied from the bestiary appear one on each line, but in PFS scenarios it seems
+              // we get them all on one line. Rather than worry about the unusual multi-word trait, we'll
+              // assume that all traits are one word which will catch the majority of cases If this is an
+              // alignment trait lets set that too
+              for( var trait of traits.split(/ +/) ) {
+                  if( trait == 'N' ||
+                      (trait.length == 2 && 'LNC'.indexOf(trait[0]) != -1 && 'GNE'.indexOf(trait[1]) != -1 )) {
+                      output.alignment = trait;
+                      continue;
+                  }
+                  if( valid_sizes.indexOf(trait.toLowerCase()) != -1 ) {
+                      output.size = trait.trim();
+                      continue;
+                  }
+                  if( !output.traits ) {
+                      output.traits = [trait.trim()];
+                  }
+                  else {
+                      output.traits.push(match[0].trim());
+                  }
               }
               return true;
           },
