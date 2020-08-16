@@ -1833,7 +1833,7 @@ function load_pdf_data(input) {
           name : 'rituals'
         },
         //Spells
-        { re  : RegExp('^(.*)Spells DC (\\d+)(.*attack ([+-]\\d+))?(.*)$',''),
+        { re  : RegExp('^(.*)Spells (?:\\d+ [fF]ocus [pP]oint.*)?DC (\\d+)(.*attack ([+-]\\d+))?(.*)$',''),
           func : (match) => {
               log('Parsing spells');
 
