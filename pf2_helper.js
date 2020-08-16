@@ -1499,7 +1499,7 @@ function load_pdf_data(input) {
     // issue we need to handle. Specifically, some of the essential blocks (AC, HP and Ability scores) don't
     // always start a line, for example the shield archon omits the line break before the ability scores for
     // some reason. We need to put them back in if they're not there.
-    let essential_re = [/[^>]Str ([+-]?\s?\d+).*Dex ([+-]?\s?\d+).*Con ([+-]?\s?\d+).*Int ([+-]?\s?\d+).*Wis ([+-]?\s?\d+).*Cha ([+-]?\s?\d+).*/g];
+    let essential_re = [/[^>]Str\s?([+-]?\s?\d+).*Dex\s?([+-]?\s?\d+).*Con\s?([+-]?\s?\d+).*Int\s?([+-]?\s?\d+).*Wis\s?([+-]?\s?\d+).*Cha\s?([+-]?\s?\d+).*/g];
     for(var re of essential_re) {
         let match = re.exec(input);
         if( match ) {
@@ -1614,10 +1614,10 @@ function load_pdf_data(input) {
         },
         // It would be nice to parse all the attributes now, but sometimes they wrap multiple lines so we'd
         // best just do the first one
-        { re : RegExp('^Str ([+-]\\d+).*'),
+        { re : RegExp('^Str\\s?([+-]\\d+).*'),
           func : (match) => {
               // The tiefling adept has a space between its + and its number. Weird. We can allow for that though
-              var data = /^Str ([+-]?\s?\d+).*Dex ([+-]?\s?\d+).*Con ([+-]?\s?\d+).*Int ([+-]?\s?\d+).*Wis ([+-]?\s?\d+).*Cha ([+-]?\s?\d+).*/.exec(match[0]);
+              var data = /^Str\s?([+-]?\s?\d+).*Dex\s?([+-]?\s?\d+).*Con\s?([+-]?\s?\d+).*Int\s?([+-]?\s?\d+).*Wis\s?([+-]?\s?\d+).*Cha\s?([+-]?\s?\d+).*/.exec(match[0]);
               if( null == data ) {
                   return;
               }
