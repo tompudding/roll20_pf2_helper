@@ -63,6 +63,12 @@ Config
 ------
 You can use the config macro to enable or disable some features, such as the roll hiding and the MAP popups that are written into the macros.
 
+* **NPC Hide Rolls** : This determines if NPCs parsed using the parse macro default to having their rolls whispered to the GM (and then echoed back to the players with the rolls removed), or rolled publicly. Setting this to false will also prevent the pop-up asking for the creature name in the parse macro, since it is not required for public rolls. It does not affect already parsed NPCs.
+* **Use MAP Popups** : Although the Roll20 character sheet has some support for MAP calculations, for the NPC sheet it currently cannot set agile on a per attack basis. When this toggle is set to true, the attack macros are written to include a MAP dialogue pop up, whose value is set based on the presence of the word 'agile' in the weapon traits. It does not affect already parsed NPCs
+* **Use Sweep/other popups** : Similar to the MAP popups, when this is set attacks with sweep in the attack traits will popup and ask if this is an attack against the first creature this turn or not and compute the sweep bonus. Forceful is determined using the MAP
+* **Use Sounds**: When this is on sounds will play on certain triggers as described below
+* **Create Macros on Start**: When the table is first loaded PF2 Helper goes through and creates macros for use. If you delete a macro, then with this toggle enabled it will be recreated the next time the table loads. Turn this off if you'd like to permanently disable these macros.
+
 Sounds
 ------
 If you have a sound called "critical_threat" it will play when an attack roll with a natural 20 is rolled in the chat. Similarly "fan_fumble" will play on a natural 1, and "roll_for_initiative" will play when the turn tracker appears.
@@ -74,7 +80,14 @@ Please send bug reports or feature requests to tom.pudding@gmail.com
 Changelog
 ---------
 
-## 1.04
+#### 1.05
+* Improve parsing of attribute arrays by coping when the space between the attribute and the value is ommited
+* Fix bug where we were skipping the first line and so ignoring the creature level
+* Handle spell lines where the number of focus points is before the DC rather than after the spell level
+* Handle multiple traits on one line
+* Rewrite the parse macro when we set NPC roll hiding to false; it shouldn't care what its secret name is
+
+#### 1.04
 
 * Fixed issue parsing strike damage entries that don't include dice, such as "Varies by bomb". Thanks to Dr. Thod for reporting.
 * Added a changelog

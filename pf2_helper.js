@@ -1,5 +1,5 @@
 var module_name = 'PF2 Helper';
-var module_version = 'v1.04';
+var module_version = 'v1.05';
 
 var skill_names = ['PERCEPTION', 'ACROBATICS', 'ARCANA', 'ATHLETICS', 'CRAFTING', 'DECEPTION', 'DIPLOMACY',
                    'INTIMIDATION', 'MEDICINE', 'NATURE', 'OCCULTISM', 'PERFORMANCE', 'RELIGION', 'SOCIETY',
@@ -1522,6 +1522,15 @@ function load_pdf_data(input) {
                   specials : [],
                   strikes : [],
                  };
+    let creature_index = lines[0].indexOf('CREATURE');
+    if( creature_index != -1 ) {
+        //We still care about this
+        lines[0] = lines[0].slice(creature_index);
+    }
+    else {
+        lines = lines.slice(1);
+    }
+
 
     var valid_skills = ['acrobatics', 'arcana', 'athletics', 'crafting', 'deception', 'diplomacy', 'intimidation',
                         'lore', 'medicine', 'nature', 'occultism', 'performance', 'religion', 'society', 'stealth',
@@ -2914,7 +2923,7 @@ function init_macros() {
         parse_full += ' {{unknown_name=?{What name should the players see? Set to empty string to use actual name|Scary Monster}}}';
     }
     else {
-        parse_full += ' {{unknown_name=Strange Monster}}';
+        parse_full += ' {{unknown_name=}}';
     }
     let required_macros = [
         {
