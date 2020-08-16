@@ -1803,7 +1803,7 @@ function load_pdf_data(input) {
         { re   : RegExp('^\\s*([A-Z]+\\s*)+$',''),
           func : (match) => {
               let traits = match[0].trim();
-              if( !trait ) {
+              if( !traits ) {
                   return;
               }
               // Traits when copied from the bestiary appear one on each line, but in PFS scenarios it seems
@@ -1824,7 +1824,7 @@ function load_pdf_data(input) {
                       output.traits = [trait.trim()];
                   }
                   else {
-                      output.traits.push(match[0].trim());
+                      output.traits.push(trait.trim());
                   }
               }
               return true;
