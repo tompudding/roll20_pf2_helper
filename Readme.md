@@ -80,6 +80,9 @@ Please send bug reports or feature requests to tom.pudding@gmail.com
 Changelog
 ---------
 
+#### 1.06
+* Stop erroneously include the "Creature" part in names.
+
 #### 1.05
 * Improve parsing of attribute arrays by coping when the space between the attribute and the value is ommited
 * Fix bug where we were skipping the first line and so ignoring the creature level

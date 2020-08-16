@@ -1,5 +1,5 @@
 var module_name = 'PF2 Helper';
-var module_version = 'v1.05';
+var module_version = 'v1.06';
 
 var skill_names = ['PERCEPTION', 'ACROBATICS', 'ARCANA', 'ATHLETICS', 'CRAFTING', 'DECEPTION', 'DIPLOMACY',
                    'INTIMIDATION', 'MEDICINE', 'NATURE', 'OCCULTISM', 'PERFORMANCE', 'RELIGION', 'SOCIETY',
@@ -1511,26 +1511,28 @@ function load_pdf_data(input) {
     let lines = input.split(/<\/p>|<br>|\n|<\/div>/ig);
 
     //The name should be the first line
-    let bracket_index = /\s*\(\s*\d+\s*\)/g.exec(lines[0]);
+    //Perhaps it's got the creature part in it
+    let creature_match = /CREATURE\s+([+-]?\d+)\s*(.*)$/g.exec(lines[0]);
     let name = lines[0].trim();
-    if( bracket_index ) {
-        name = lines[0].substring(0, bracket_index.index);
-    }
-    //try removing non-printable with magic from stack overflow
-    name = name.replace(/[^ -~]+/g, "");
-    var output = {name : name,
-                  specials : [],
-                  strikes : [],
-                 };
-    let creature_index = lines[0].indexOf('CREATURE');
-    if( creature_index != -1 ) {
-        //We still care about this
-        lines[0] = lines[0].slice(creature_index);
+    if( creature_match ) {
+        name = lines[0].substring(0, creature_match.index).trim();
+        lines[0] = lines[0].substring(creature_match.index);
     }
     else {
         lines = lines.slice(1);
     }
 
+    let bracket_index = /\s*\(\s*\d+\s*\)/g.exec(name);
+    if( bracket_index ) {
+        name = lines[0].substring(0, bracket_index.index);
+    }
+    //try removing non-printable with magic from stack overflow
+    name = name.replace(/[^ -~]+/g, "");
+
+    var output = {name : name,
+                  specials : [],
+                  strikes : [],
+                 };
 
     var valid_skills = ['acrobatics', 'arcana', 'athletics', 'crafting', 'deception', 'diplomacy', 'intimidation',
                         'lore', 'medicine', 'nature', 'occultism', 'performance', 'religion', 'society', 'stealth',
