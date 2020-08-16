@@ -1535,7 +1535,12 @@ function load_pdf_data(input) {
           func : (match) => {
               log('Parsing Creature tag');
               output.level = parseInt(match[1]);
-              output.traits = match[2].split(/[ ,]+/);
+              if( match[2] ) {
+                  output.traits = match[2].split(/[ ,]+/);
+              }
+              else {
+                  output.traits = [];
+              }
               return true;
           },
           name : 'level',
@@ -1994,8 +1999,7 @@ function load_pdf_data(input) {
     // The first pass will be to fold lines together so we have one line for each thing. The only difficult
     // part to that is special abilities that don't have an action because we can't match on an initial
     // keyword and we lose the bold in the next form. We'll try using if the first n words are capitalized and
-    //for(var line of lines.slice(1)) {
-    for(var line_num = 1; line_num < lines.length; line_num++) {
+    for(var line_num = 0; line_num < lines.length; line_num++) {
         let line = lines[line_num];
         let last_line = lines[line_num - 1];
         // Sometimes when copying from a pdf we get a number on a line on its own, I'm not sure why.
